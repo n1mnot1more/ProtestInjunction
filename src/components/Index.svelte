@@ -30,53 +30,6 @@
 	<!-- LEFT MAP -->
 	<div class="map-column">
 
-		<!-- LEGEND BAR -->
-		<div class="legend-bar">
-
-			<div class="legend">
-
-				<div class="legend-title">
-					Hectares injuncted
-				</div>
-
-				<div class="legend-scale">
-
-					<div class="legend-item">
-						<div class="legend-dot" style="background:#61187a;"></div>
-						<span>0-5</span>
-					</div>
-
-					<div class="legend-item">
-						<div class="legend-dot" style="background:#b0349a;"></div>
-						<span>20</span>
-					</div>
-
-					<div class="legend-item">
-						<div class="legend-dot" style="background:#e04d79;"></div>
-						<span>100</span>
-					</div>
-
-					<div class="legend-item">
-						<div class="legend-dot" style="background:#fd842b;"></div>
-						<span>300</span>
-					</div>
-
-					<div class="legend-item">
-						<div class="legend-dot" style="background:#fec083;"></div>
-						<span>500</span>
-					</div>
-
-					<div class="legend-item">
-						<div class="legend-dot" style="background:#fcfd4f;"></div>
-						<span>500-1300</span>
-					</div>
-
-				</div>
-
-			</div>
-
-		</div>
-
 		<!-- MAP -->
 		<div class="map-sticky">
 			<Map />
@@ -118,7 +71,7 @@
 
 /* LEGEND BAR */
 .legend-bar {
-	height: 72px;
+	height: 10px;
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
@@ -132,8 +85,8 @@
 /* MAP AREA */
 .map-sticky {
 	position: sticky;
-	top: 72px;
-	height: calc(100vh - 72px);
+	top: 10px;
+	height: calc(100vh - 10px);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -141,42 +94,7 @@
 	background: #0a061b;
 }
 
-/* LEGEND */
-.legend {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: 0.45rem;
-	color: white;
-	font-size: 0.72rem;
-	line-height: 1;
-	text-shadow: 0 1px 3px rgba(0,0,0,0.85),
-	             0 0 8px rgba(0,0,0,0.6);
-}
 
-.legend-title {
-	font-weight: 600;
-	letter-spacing: 0.02em;
-}
-
-.legend-scale {
-	display: flex;
-	align-items: center;
-	gap: 0.7rem;
-}
-
-.legend-item {
-	display: flex;
-	align-items: center;
-	gap: 0.28rem;
-}
-
-.legend-dot {
-	width: 9px;
-	height: 9px;
-	border-radius: 50%;
-	flex-shrink: 0;
-}
 
 /* RIGHT TEXT */
 .text-column {
@@ -224,27 +142,6 @@ p {
 		pointer-events: none;
 	}
 
-	.legend-bar {
-		height: auto;
-		padding: 1rem;
-		justify-content: flex-end;
-	}
-
-	.legend {
-		font-size: 0.62rem;
-	}
-
-	.legend-scale {
-		gap: 0.45rem;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-		max-width: 220px;
-	}
-
-	.legend-dot {
-		width: 8px;
-		height: 8px;
-	}
 
 	.map-sticky {
 		position: absolute;
