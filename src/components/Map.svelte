@@ -4,19 +4,26 @@ import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import { onMount } from "svelte";
 
-let canvas;
-let hoverCanvas;
 let hitCanvas;
 let wardHitCanvas;
 
-let context;
-let hoverContext;
 let hitContext;
 let wardHitContext;
 
-let path;
 let hitPath;
 let wardHitPath;
+
+const colorToLad = new Map();
+const colorToWard = new Map();
+
+let canvas;
+let hoverCanvas;
+
+let context;
+let hoverContext;
+
+let path;
+let hoverPath;
 
 let wards;
 let lads;
@@ -24,26 +31,22 @@ let engwal;
 
 let hovered = $state(null);
 let hoveredWard = $state(null);
+
+/* tooltip position */
 let tooltipX = $state(0);
 let tooltipY = $state(0);
 
 let width;
 let height;
-let dpi;
+let dpr;
 
-let pendingHovered = null;
-let pendingHoveredWard = null;
-let hoverTimeout;
-
-const colorToLad = new Map();
-const colorToWard = new Map();
-
-/* -----------------------------
-   MODE (injunctions toggle via scroll)
------------------------------ */
+let projection;
 
 let mode = $state("area");
 
+/* -----------------------------
+   MODE
+----------------------------- */
 function updateModeFromScroll() {
   const el = document.getElementById("stories");
   if (!el) return;
@@ -60,7 +63,6 @@ function updateModeFromScroll() {
 /* -----------------------------
    SCALE
 ----------------------------- */
-
 const areaScale = d3.scaleThreshold()
   .domain([0.0001, 5, 20, 100, 300, 500, 1300])
   .range([
@@ -89,7 +91,7 @@ const injScale = d3.scaleThreshold()
 function getWardValue(feature) {
   if (mode === "injunctions") {
     const v = +feature.properties.injunction_names;
-    return Number.isFinite(v) && v > 0 ? v : 0;
+    return Number.isFinite(v) ? v : 0;
   }
 
   const v = +feature.properties.covered_area_ha;
@@ -99,12 +101,11 @@ function getWardValue(feature) {
 /* -----------------------------
    BASE MAP
 ----------------------------- */
-
 function drawBaseMap() {
 
   context.clearRect(0, 0, width, height);
 
-  wards.features.forEach((feature) => {
+  for (const feature of wards.features) {
 
     context.beginPath();
     path(feature);
@@ -115,7 +116,7 @@ function drawBaseMap() {
         : areaScale(getWardValue(feature));
 
     context.fill();
-  });
+  }
 
   context.beginPath();
   path(engwal);
@@ -124,45 +125,63 @@ function drawBaseMap() {
   context.stroke();
 }
 
+
 /* -----------------------------
    HOVER
 ----------------------------- */
 
-function drawHover() {
+function getFeatureAtPoint(x, y, ctx, colorMap) {
+  const radius = 2.5 ;
+  const size = radius * 2 + 1;
 
-  hoverContext.clearRect(0, 0, width, height);
+  const px = Math.round(x * dpr);
+  const py = Math.round(y * dpr);
 
-  if (hoveredWard) {
-    hoverContext.beginPath();
-    path.context(hoverContext)(hoveredWard);
+  const data = ctx.getImageData(
+    px - radius,
+    py - radius,
+    size,
+    size
+  ).data;
 
-    hoverContext.strokeStyle = "#fff";
-    hoverContext.lineWidth = 0.45;
-    hoverContext.globalAlpha = 0.9;
-    hoverContext.stroke();
+  const counts = new Map();
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    if (r === 0 && g === 0 && b === 0) continue;
+
+    const key = `${r},${g},${b}`;
+
+    const feature = colorMap.get(key);
+
+    if (!feature) continue;
+
+    counts.set(
+      feature,
+      (counts.get(feature) || 0) + 1
+    );
   }
 
-  if (hovered) {
-    hoverContext.beginPath();
-    path.context(hoverContext)(hovered);
+  if (!counts.size) return null;
 
-    hoverContext.strokeStyle = "#fff";
-    hoverContext.lineWidth = 1.2;
-    hoverContext.globalAlpha = 1;
-    hoverContext.stroke();
+  let best = null;
+  let bestCount = 0;
+
+  for (const [feature, count] of counts) {
+    if (count > bestCount) {
+      best = feature;
+      bestCount = count;
+    }
   }
 
-  hoverContext.globalAlpha = 1;
+  return best;
 }
-
-/* -----------------------------
-   HIT MAPS
------------------------------ */
+ 
 
 function buildLadHitMap() {
-
-  hitContext.clearRect(0, 0, width, height);
-
   lads.features.forEach((feature, i) => {
     const r = (i + 1) & 255;
     const g = ((i + 1) >> 8) & 255;
@@ -180,9 +199,6 @@ function buildLadHitMap() {
 }
 
 function buildWardHitMap() {
-
-  wardHitContext.clearRect(0, 0, width, height);
-
   wards.features.forEach((feature, i) => {
     const r = (i + 1) & 255;
     const g = ((i + 1) >> 8) & 255;
@@ -199,62 +215,38 @@ function buildWardHitMap() {
   });
 }
 
-/* -----------------------------
-   PICK FEATURE
------------------------------ */
+function drawHover() {
 
-function getFeatureAtPoint(x, y, ctx, map) {
+  hoverContext.clearRect(0, 0, width, height);
 
-  const radius = 3;
-  const size = radius * 2 + 1;
+  if (hoveredWard) {
+    hoverContext.beginPath();
+    hoverPath(hoveredWard);
 
-  const px = Math.round(x * dpi);
-  const py = Math.round(y * dpi);
-
-  const data = ctx.getImageData(
-    px - radius,
-    py - radius,
-    size,
-    size
-  ).data;
-
-  const counts = new Map();
-
-  for (let i = 0; i < data.length; i += 4) {
-
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-
-    if (r === 0 && g === 0 && b === 0) continue;
-
-    const key = `${r},${g},${b}`;
-
-    const feature = map.get(key);
-
-    if (!feature) continue;
-
-    counts.set(feature, (counts.get(feature) || 0) + 1);
+    hoverContext.strokeStyle = "#fff";
+    hoverContext.lineWidth = 0.6;
+    hoverContext.globalAlpha = 0.9;
+    hoverContext.stroke();
   }
 
-  if (!counts.size) return null;
+  if (hovered) {
+    hoverContext.beginPath();
+    hoverPath(hovered);
 
-  let best = null;
-  let bestCount = 0;
-
-  for (const [f, c] of counts) {
-    if (c > bestCount) {
-      best = f;
-      bestCount = c;
-    }
+    hoverContext.strokeStyle = "#fff";
+    hoverContext.lineWidth = 1.2;
+    hoverContext.globalAlpha = 1;
+    hoverContext.stroke();
   }
 
-  return best;
+  hoverContext.globalAlpha = 1;
 }
 
 /* -----------------------------
    INIT
 ----------------------------- */
-
 onMount(async () => {
+
 
   const mobile = window.innerWidth < 900;
 
@@ -263,81 +255,108 @@ onMount(async () => {
     ? window.innerHeight
     : window.innerHeight - 72;
 
-  dpi = window.devicePixelRatio || 1;
+  dpr = window.devicePixelRatio || 1;
 
   const topo = await d3.json(`${base}/wards.topo.json`);
-  wards = topojson.feature(topo, topo.objects[Object.keys(topo.objects)[0]]);
+  wards = topojson.feature(
+    topo,
+    topo.objects[Object.keys(topo.objects)[0]]
+  );
 
   const ladTopo = await d3.json(`${base}/lads.topo.json`);
-  lads = topojson.feature(ladTopo, ladTopo.objects[Object.keys(ladTopo.objects)[0]]);
+  lads = topojson.feature(
+    ladTopo,
+    ladTopo.objects[Object.keys(ladTopo.objects)[0]]
+  );
 
   const engwalTopo = await d3.json(`${base}/engwal.topo.json`);
-  engwal = topojson.feature(engwalTopo, engwalTopo.objects[Object.keys(engwalTopo.objects)[0]]);
+  engwal = topojson.feature(
+    engwalTopo,
+    engwalTopo.objects[Object.keys(engwalTopo.objects)[0]]
+  );
 
-  /* ✅ FIX: use PURE CSS PIXELS for projection */
-  const renderWidth = width;
-  const renderHeight = height;
 
-  const projection = d3.geoIdentity()
-    .reflectY(true)
-    .fitExtent(
-      [[15, 15], [renderWidth - 15, renderHeight - 15]],
-      wards
-    );
+projection = d3.geoIdentity()
+  .reflectY(true)
+  .fitExtent(
+    [[15, 15], [width - 15, height - 15]],
+    wards
+  );
 
-  /* CANVAS */
-  canvas.width = width * dpi;
-  canvas.height = height * dpi;
-  context = canvas.getContext("2d");
-  context.setTransform(dpi, 0, 0, dpi, 0, 0);
+canvas.width = width * dpr;
+canvas.height = height * dpr;
 
-  hoverCanvas.width = width * dpi;
-  hoverCanvas.height = height * dpi;
-  hoverContext = hoverCanvas.getContext("2d");
-  hoverContext.setTransform(dpi, 0, 0, dpi, 0, 0);
+hoverCanvas.width = width * dpr;
+hoverCanvas.height = height * dpr;
 
-  hitCanvas.width = width * dpi;
-  hitContext = hitCanvas.getContext("2d");
-  hitContext.setTransform(dpi, 0, 0, dpi, 0, 0);
+context = canvas.getContext("2d");
+hoverContext = hoverCanvas.getContext("2d");
 
-  wardHitCanvas.width = width * dpi;
-  wardHitContext = wardHitCanvas.getContext("2d");
-  wardHitContext.setTransform(dpi, 0, 0, dpi, 0, 0);
+context.setTransform(dpr, 0, 0, dpr, 0, 0);
+hoverContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  path = d3.geoPath(projection, context);
-  hitPath = d3.geoPath(projection, hitContext);
-  wardHitPath = d3.geoPath(projection, wardHitContext);
+path = d3.geoPath(projection, context);
+hoverPath = d3.geoPath(projection, hoverContext);
 
-  buildLadHitMap();
-  buildWardHitMap();
-  drawBaseMap();
+/* HIT CANVASES */
 
-  window.addEventListener("scroll", updateModeFromScroll);
+hitCanvas.width = width * dpr;
+hitCanvas.height = height * dpr;
 
-  canvas.addEventListener("mousemove", (e) => {
+wardHitCanvas.width = width * dpr;
+wardHitCanvas.height = height * dpr;
 
-    const bounds = canvas.getBoundingClientRect();
+hitContext = hitCanvas.getContext("2d");
+wardHitContext = wardHitCanvas.getContext("2d");
 
-    const x = ((e.clientX - bounds.left) / bounds.width) * width;
-    const y = ((e.clientY - bounds.top) / bounds.height) * height;
+hitContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+wardHitContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    tooltipX = e.clientX - bounds.left;
-    tooltipY = e.clientY - bounds.top;
+hitContext.clearRect(0, 0, width, height);
+wardHitContext.clearRect(0, 0, width, height);
 
-    const nextLad = getFeatureAtPoint(x, y, hitContext, colorToLad);
-    const nextWard = getFeatureAtPoint(x, y, wardHitContext, colorToWard);
+colorToLad.clear();
+colorToWard.clear();
 
-    pendingHovered = nextLad;
-    pendingHoveredWard = nextWard;
+hitPath = d3.geoPath(projection, hitContext);
+wardHitPath = d3.geoPath(projection, wardHitContext);
 
-    clearTimeout(hoverTimeout);
+buildLadHitMap();
+buildWardHitMap();
 
-    hoverTimeout = setTimeout(() => {
-      hovered = pendingHovered;
-      hoveredWard = pendingHoveredWard;
-      requestAnimationFrame(drawHover);
-    }, 10);
-  });
+drawBaseMap();
+
+window.addEventListener("scroll", updateModeFromScroll);
+
+canvas.addEventListener("mousemove", (e) => {
+
+  const rect = canvas.getBoundingClientRect();
+
+  const x =
+    ((e.clientX - rect.left) / rect.width) * width;
+
+  const y =
+    ((e.clientY - rect.top) / rect.height) * height;
+
+  tooltipX = e.clientX - rect.left;
+  tooltipY = e.clientY - rect.top;
+
+  hoveredWard = getFeatureAtPoint(
+    x,
+    y,
+    wardHitContext,
+    colorToWard
+  );
+
+  hovered = getFeatureAtPoint(
+    x,
+    y,
+    hitContext,
+    colorToLad
+  );
+
+  requestAnimationFrame(drawHover);
+});
 
   canvas.addEventListener("mouseleave", () => {
     hovered = null;
@@ -352,23 +371,26 @@ onMount(async () => {
 <div class="map-wrap">
   <canvas bind:this={canvas} class="base" />
   <canvas bind:this={hoverCanvas} class="hover" />
-  <canvas bind:this={hitCanvas} style="display:none;" />
-  <canvas bind:this={wardHitCanvas} style="display:none;" />
+<canvas bind:this={hitCanvas} style="display:none;" />
+<canvas bind:this={wardHitCanvas} style="display:none;" />
 
   {#if hoveredWard}
-    <div class="tooltip" style="left:{tooltipX + 20}px; top:{tooltipY - 10}px;">
+    <div
+      class="tooltip"
+      style="left:{tooltipX + 20}px; top:{tooltipY - 10}px;"
+    >
       <div>{hoveredWard.properties.WARD_Name}</div>
 
       <div>
         in {hovered?.properties?.["LAD Name"] ?? "Unknown LAD"}
       </div>
 
-      <div>
-        {mode === "injunctions"
-          ? `${+hoveredWard.properties.injunction_names || 0} injunctions`
-          : `${hoveredWard.properties.covered_area_ha ?? "?"} hectares injuncted`
-        }
-      </div>
+<div>
+  {mode === "injunctions"
+    ? `${+hoveredWard.properties.injunction_names || 0} injuncted areas`
+    : `${Math.max(0, +hoveredWard.properties.covered_area_ha || 0)} hectares injuncted`
+  }
+</div>
     </div>
   {/if}
 </div>
@@ -387,8 +409,14 @@ canvas {
   height: 100%;
 }
 
-.base  { z-index: 1; }
-.hover { z-index: 2; pointer-events: none; }
+.base {
+  z-index: 1;
+}
+
+.hover {
+  z-index: 2;
+  pointer-events: none;
+}
 
 .tooltip {
   position: absolute;
