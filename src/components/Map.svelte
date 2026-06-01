@@ -644,6 +644,12 @@ canvas {
   z-index: 1; /* 👈 ADD */
 }
 
+@media (max-width: 900px) {
+	.canvas-stack {
+		inset: 64px 0 0 0; /* height of mobile header */
+	}
+}
+
 .legend-bar {
   position: absolute;
   top: 0;

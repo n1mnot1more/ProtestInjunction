@@ -145,20 +145,21 @@
 
 /* MOBILE (unchanged) */
 @media (max-width: 900px) {
-  .nav {
-    top: 1rem;
-    bottom: auto; /* 👈 important fix */
 
-    left: 50%;
-    right: auto;
+	.nav {
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: auto;
 
-    transform: translateX(-50%);
+		transform: none;
 
-    justify-content: center;
+		width: 100%;
+		justify-content: center;
 
-    max-width: calc(100vw - 2rem);
+		padding: 0.75rem 0.75rem;
 
-    gap: 0.4rem;
-  }
+		flex-wrap: wrap;
+	}
 }
 </style>
