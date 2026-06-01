@@ -145,27 +145,20 @@
 
 /* MOBILE (unchanged) */
 @media (max-width: 900px) {
+  .nav {
+    top: 1rem;
+    bottom: auto; /* 👈 important fix */
 
-	.nav {
-		top: auto;
-		bottom: 1rem;
+    left: 50%;
+    right: auto;
 
-		left: 50%;
-		right: auto;
+    transform: translateX(-50%);
 
-		transform: translateX(-50%);
+    justify-content: center;
 
-		justify-content: center;
+    max-width: calc(100vw - 2rem);
 
-		max-width: calc(100vw - 2rem);
-
-		gap: 0.4rem;
-	}
-
-	.nav button {
-		font-size: 0.66rem;
-		padding: 0.45rem 0.75rem;
-	}
+    gap: 0.4rem;
+  }
 }
-
 </style>
