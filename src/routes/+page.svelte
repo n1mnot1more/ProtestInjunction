@@ -1,6 +1,11 @@
 <script>
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
+import { base } from "$app/paths";
+
+function enterSite() {
+  goto(`${base}/map`);
+}
 
   let canvas;
   let ctx;
@@ -12,9 +17,7 @@
   let unlocked = false;
   let eraseAmount = 0;
 
-  function enterSite() {
-    goto("/map");
-  }
+
 
   function startErase(e) {
     drawing = true;

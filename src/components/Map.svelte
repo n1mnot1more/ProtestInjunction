@@ -548,7 +548,7 @@ if (geography === "ward") {
       <div>
         {mode === "injunctions"
           ? `${+hoveredWard.properties.injunction_names || 0} injuncted areas`
-          : `${Math.max(0, +hoveredWard.properties.covered_area_ha || 0)} hectares injuncted`
+          : `${Math.max(0, +hoveredWard.properties.covered_area_ha || 0)} Ward - hectares injuncted`
         }
       </div>
     </div>
@@ -562,7 +562,7 @@ if (geography === "ward") {
       <div>
         {mode === "injunctions"
           ? `${+hovered.properties["Injunction Names"] || 0} injuncted areas`
-          : `${Number(getValue(hovered) || 0).toFixed(2)} hectares injuncted`
+          : `${Number(getValue(hovered) || 0).toFixed(2)} LAD - hectares injuncted`
         }
       </div>
     </div>
