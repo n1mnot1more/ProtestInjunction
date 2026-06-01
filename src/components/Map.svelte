@@ -161,24 +161,32 @@ function getValue(feature) {
 function drawBaseMap() {
   context.clearRect(0, 0, width, height);
 
+  context.save();
+
+  context.beginPath();
+  path(engwal);
+  context.clip();
+
   const features =
     geography === "ward"
       ? wards.features
       : lads.features;
 
-  const view = getView(); // ✅ compute ONCE
+  const view = getView();
 
   for (const feature of features) {
     context.beginPath();
     path(feature);
 
     context.fillStyle = scales[view](getValue(feature));
-
     context.fill();
   }
 
+  context.restore();
+
   context.beginPath();
   path(engwal);
+
   context.strokeStyle = "#262235";
   context.lineWidth = 2;
   context.stroke();
