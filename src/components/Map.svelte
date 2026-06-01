@@ -54,7 +54,7 @@ let scale = $state(1);
 
 const legends = {
   ward_area: {
-    title: "Hectares injuncted",
+    title: "Ward - Hectares injuncted",
     labels: ["0–5", "20", "100", "300", "500", "500–1300"],
     colors: ["#61187a", "#b0349a", "#e04d79", "#fd842b", "#fec083", "#fcfd4f"]
   },
@@ -66,7 +66,7 @@ const legends = {
   },
 
   lad_area: {
-    title: "Hectares injuncted",
+    title: "LAD - Hectares injuncted",
     labels: ["0–5", "20", "100", "500", "1000", "1000+"],
     colors: ["#61187a", "#b0349a", "#e04d79", "#fd842b", "#fec083", "#fcfd4f"]
   },
@@ -548,7 +548,7 @@ if (geography === "ward") {
       <div>
         {mode === "injunctions"
           ? `${+hoveredWard.properties.injunction_names || 0} injuncted areas`
-          : `${Math.max(0, +hoveredWard.properties.covered_area_ha || 0)} Ward - hectares injuncted`
+          : `${Math.max(0, +hoveredWard.properties.covered_area_ha || 0)} hectares injuncted`
         }
       </div>
     </div>
@@ -562,7 +562,7 @@ if (geography === "ward") {
       <div>
         {mode === "injunctions"
           ? `${+hovered.properties["Injunction Names"] || 0} injuncted areas`
-          : `${Number(getValue(hovered) || 0).toFixed(2)} LAD - hectares injuncted`
+          : `${Number(getValue(hovered) || 0).toFixed(2)} hectares injuncted`
         }
       </div>
     </div>
