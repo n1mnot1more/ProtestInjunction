@@ -23,28 +23,40 @@
 			block: "start"
 		});
 
-		open = false; // close menu on mobile
+		open = false;
 	}
 </script>
 
 <header class="header">
-	<!-- LOGO (always visible) -->
-	<a href="{base}/" class="logo" aria-label="home">
+
+	<!-- MOBILE LOGO -->
+	<a href="{base}/" class="mobile-logo" aria-label="home">
 		{@html wordmark}
 	</a>
 
-	<!-- HAMBURGER (mobile only) -->
-	<button class="burger" on:click={() => (open = !open)}>
+	<!-- MOBILE BURGER -->
+	<button
+		class="burger"
+		on:click={() => (open = !open)}
+		aria-label="menu"
+	>
 		☰
 	</button>
 
-	<!-- OVERLAY -->
 	{#if open}
-		<div class="overlay" on:click={() => (open = false)}></div>
+		<div
+			class="overlay"
+			on:click={() => (open = false)}
+		/>
 	{/if}
 
-	<!-- NAV -->
-	<nav class="nav {open ? 'open' : ''}">
+	<nav class:open={open} class="nav">
+
+		<!-- DESKTOP LOGO -->
+		<a href="{base}/" class="nav-logo" aria-label="home">
+			{@html wordmark}
+		</a>
+
 		{#each nav as item}
 			<button
 				class:selected={active === item.id}
@@ -53,139 +65,209 @@
 				{item.label}
 			</button>
 		{/each}
+
 	</nav>
+
 </header>
 
 <style>
+
 .header {
-	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	z-index: 1000;
-	pointer-events: none; /* allow map interaction except UI */
-}
-
-/* LOGO TOP LEFT */
-.logo {
-	position: absolute;
-	top: 0.75rem;
-	left: 0.75rem;
-
-	width: 2.8rem;
-	opacity: 0.9;
-	pointer-events: auto;
-}
-
-.logo:hover {
-	opacity: 1;
-}
-
-.logo :global(svg) {
-	width: 100%;
-	height: auto;
+	background: #0a061b;
+	color: white;
 }
 
 /* DESKTOP NAV */
+
 .nav {
-	position: absolute;
-	top: 1rem;
+	position: fixed;
+	top: 1.25rem;
 	right: 1.5rem;
 
-	display: flex;
-	gap: 0.5rem;
-	align-items: center;
+	z-index: 1000;
 
-	pointer-events: auto;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+
+	flex-wrap: wrap;
 }
 
-/* BUTTON STYLE */
+/* DESKTOP LOGO */
+
+.nav-logo {
+	display: flex;
+	align-items: center;
+
+	max-width: 3.2em;
+
+	margin-right: 0.4rem;
+
+	opacity: 0.85;
+
+	transition: opacity 0.2s ease;
+}
+
+.nav-logo:hover {
+	opacity: 1;
+}
+
+.nav-logo :global(svg) {
+	width: 100%;
+	height: auto;
+	display: block;
+}
+
+/* MOBILE LOGO */
+
+.mobile-logo {
+	display: none;
+}
+
+/* BUTTONS */
+
 .nav button {
 	background: rgba(18, 12, 34, 0.82);
+
 	backdrop-filter: blur(10px);
 
 	border: 1px solid rgba(255,255,255,0.08);
+
 	color: rgba(255,255,255,0.82);
 
 	font-size: 0.72rem;
 	font-weight: 600;
+	letter-spacing: 0.02em;
 	text-transform: uppercase;
 
 	padding: 0.5rem 0.9rem;
+
 	border-radius: 999px;
 
 	cursor: pointer;
 
-	transition: 0.2s ease;
+	box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+
+	transition:
+		transform 0.18s ease,
+		background 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease;
 }
 
 .nav button:hover {
-	border-color: #ff6a00;
-	color: #ff6a00;
+	transform: translateY(-1px);
+	background: rgba(40, 22, 70, 0.92);
+	border-color: rgba(255,255,255,0.16);
+	color: white;
 }
 
 .nav button.selected {
-	background: rgba(255, 106, 0, 0.12);
-	border-color: #ff6a00;
-	color: #ff6a00;
+	background: rgba(255,255,255,0.10);
+	border-color: rgba(252,253,79,0.55);
+	color: #fcfd4f;
+
+	box-shadow:
+		0 0 0 1px rgba(252,253,79,0.15),
+		0 6px 18px rgba(0,0,0,0.35);
 }
 
-/* HAMBURGER (hidden desktop) */
+/* BURGER */
+
 .burger {
 	display: none;
-	position: absolute;
-	top: 0.6rem;
-	right: 0.75rem;
-
-	font-size: 1.5rem;
-	background: none;
-	border: none;
-	color: white;
-
-	pointer-events: auto;
-	cursor: pointer;
 }
 
 /* OVERLAY */
+
 .overlay {
 	position: fixed;
 	inset: 0;
-	background: rgba(0,0,0,0.5);
+
+	background: rgba(0,0,0,0.45);
+
 	backdrop-filter: blur(2px);
+
+	z-index: 999;
 }
 
-/* MOBILE MODE */
+/* MOBILE */
+
 @media (max-width: 900px) {
 
-	.burger {
+	.nav-logo {
+		display: none;
+	}
+
+	.mobile-logo {
+		display: block;
+
+		position: fixed;
+		top: 0.75rem;
+		left: 0.75rem;
+
+		width: 2.8rem;
+
+		z-index: 1002;
+	}
+
+	.mobile-logo :global(svg) {
+		width: 100%;
+		height: auto;
 		display: block;
 	}
 
-	/* slide-in menu */
+	.burger {
+		display: block;
+
+		position: fixed;
+		top: 0.55rem;
+		right: 0.75rem;
+
+		z-index: 1002;
+
+		background: none;
+		border: none;
+
+		color: white;
+		font-size: 1.8rem;
+
+		cursor: pointer;
+	}
+
 	.nav {
 		position: fixed;
+
 		top: 0;
-		left: 0;
+		left: -240px;
+
+		width: 220px;
 		height: 100vh;
 
+		padding: 5rem 1rem 1rem;
+
+		background: rgba(10, 6, 27, 0.96);
+
+		backdrop-filter: blur(12px);
+
 		flex-direction: column;
-		align-items: flex-start;
-		gap: 1rem;
+		align-items: stretch;
 
-		padding: 5rem 1.5rem;
+		gap: 0.75rem;
 
-		width: 75%;
-		max-width: 280px;
+		transition: left 0.25s ease;
 
-		background: rgba(10, 6, 27, 0.98);
-		backdrop-filter: blur(10px);
-
-		transform: translateX(-100%);
-		transition: transform 0.25s ease;
+		z-index: 1001;
 	}
 
 	.nav.open {
-		transform: translateX(0);
+		left: 0;
+	}
+
+	.nav button {
+		width: 100%;
+		text-align: left;
 	}
 }
+
 </style>
