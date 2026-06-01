@@ -1,4 +1,3 @@
-import adapterStatic from "@sveltejs/adapter-static";
 import adapter from '@sveltejs/adapter-static';
 import { sveltePreprocess } from "svelte-preprocess";
 import autoprefixer from "autoprefixer";
@@ -11,7 +10,9 @@ const preprocess = sveltePreprocess({
 	}
 });
 
-const config = {
+export default {
+	preprocess,
+
 	kit: {
 		adapter: adapter({
 			pages: 'build',
@@ -24,5 +25,3 @@ const config = {
 		}
 	}
 };
-
-export default config;
