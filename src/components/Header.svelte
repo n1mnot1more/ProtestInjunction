@@ -80,7 +80,7 @@
 
 	opacity: 0.85;
 
-	transform: rotate(-3deg);
+	transform: rotate(0deg);
 
 	transition: opacity 0.2s ease;
 }
