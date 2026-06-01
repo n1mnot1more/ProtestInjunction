@@ -10,30 +10,41 @@
 	];
 
 	let active = "map";
+	let open = false;
 
 	function goTo(id) {
 		active = id;
 
 		const el = document.getElementById(id);
-
 		if (!el) return;
 
 		el.scrollIntoView({
 			behavior: "smooth",
 			block: "start"
 		});
+
+		open = false; // close menu on mobile
 	}
 </script>
 
 <header class="header">
+	<!-- LOGO (always visible) -->
+	<a href="{base}/" class="logo" aria-label="home">
+		{@html wordmark}
+	</a>
 
-	<nav class="nav">
+	<!-- HAMBURGER (mobile only) -->
+	<button class="burger" on:click={() => (open = !open)}>
+		☰
+	</button>
 
-		<!-- INLINE SMALL LOGO (NEW) -->
-		<a href="{base}/" class="nav-logo" aria-label="home">
-			{@html wordmark}
-		</a>
+	<!-- OVERLAY -->
+	{#if open}
+		<div class="overlay" on:click={() => (open = false)}></div>
+	{/if}
 
+	<!-- NAV -->
+	<nav class="nav {open ? 'open' : ''}">
 		{#each nav as item}
 			<button
 				class:selected={active === item.id}
@@ -42,124 +53,139 @@
 				{item.label}
 			</button>
 		{/each}
-
 	</nav>
-
 </header>
 
 <style>
-
 .header {
-	background: #0a061b;
-	color: white;
-}
-
-/* NAV (unchanged except layout support) */
-.nav {
 	position: fixed;
-	top: 1.25rem;
-	right: 1.5rem;
-
+	top: 0;
+	left: 0;
+	right: 0;
 	z-index: 1000;
-
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-
-	flex-wrap: wrap;
+	pointer-events: none; /* allow map interaction except UI */
 }
 
-/* NEW: inline logo inside nav */
-.nav-logo {
-	display: flex;
-	align-items: center;
+/* LOGO TOP LEFT */
+.logo {
+	position: absolute;
+	top: 0.75rem;
+	left: 0.75rem;
 
-	max-width: 3.2em;
-
-	margin-right: 0.4rem;
-
-	opacity: 0.85;
-
-	transform: rotate(0deg);
-
-	transition: opacity 0.2s ease;
+	width: 2.8rem;
+	opacity: 0.9;
+	pointer-events: auto;
 }
 
-.nav-logo:hover {
+.logo:hover {
 	opacity: 1;
 }
 
-/* ensure svg scales properly */
-.nav-logo :global(svg) {
+.logo :global(svg) {
 	width: 100%;
 	height: auto;
-	display: block;
 }
 
-/* BUTTONS (unchanged) */
+/* DESKTOP NAV */
+.nav {
+	position: absolute;
+	top: 1rem;
+	right: 1.5rem;
+
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+
+	pointer-events: auto;
+}
+
+/* BUTTON STYLE */
 .nav button {
 	background: rgba(18, 12, 34, 0.82);
-
 	backdrop-filter: blur(10px);
 
 	border: 1px solid rgba(255,255,255,0.08);
-
 	color: rgba(255,255,255,0.82);
 
 	font-size: 0.72rem;
 	font-weight: 600;
-	letter-spacing: 0.02em;
 	text-transform: uppercase;
 
 	padding: 0.5rem 0.9rem;
-
 	border-radius: 999px;
 
 	cursor: pointer;
 
-	box-shadow: 0 4px 18px rgba(0,0,0,0.35);
-
-	transition:
-		transform 0.18s ease,
-		background 0.18s ease,
-		border-color 0.18s ease,
-		color 0.18s ease;
+	transition: 0.2s ease;
 }
 
 .nav button:hover {
-	transform: translateY(-1px);
-	background: rgba(40, 22, 70, 0.92);
-	border-color: rgba(255,255,255,0.16);
-	color: white;
+	border-color: #ff6a00;
+	color: #ff6a00;
 }
 
 .nav button.selected {
-	background: rgba(255,255,255,0.10);
-	border-color: rgba(252,253,79,0.55);
-	color: #fcfd4f;
-
-	box-shadow:
-		0 0 0 1px rgba(252,253,79,0.15),
-		0 6px 18px rgba(0,0,0,0.35);
+	background: rgba(255, 106, 0, 0.12);
+	border-color: #ff6a00;
+	color: #ff6a00;
 }
 
-/* MOBILE (unchanged) */
+/* HAMBURGER (hidden desktop) */
+.burger {
+	display: none;
+	position: absolute;
+	top: 0.6rem;
+	right: 0.75rem;
+
+	font-size: 1.5rem;
+	background: none;
+	border: none;
+	color: white;
+
+	pointer-events: auto;
+	cursor: pointer;
+}
+
+/* OVERLAY */
+.overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0,0,0,0.5);
+	backdrop-filter: blur(2px);
+}
+
+/* MOBILE MODE */
 @media (max-width: 900px) {
 
+	.burger {
+		display: block;
+	}
+
+	/* slide-in menu */
 	.nav {
+		position: fixed;
 		top: 0;
 		left: 0;
-		right: 0;
-		bottom: auto;
+		height: 100vh;
 
-		transform: none;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 1rem;
 
-		width: 100%;
-		justify-content: center;
+		padding: 5rem 1.5rem;
 
-		padding: 0.75rem 0.75rem;
+		width: 75%;
+		max-width: 280px;
 
-		flex-wrap: wrap;
+		background: rgba(10, 6, 27, 0.98);
+		backdrop-filter: blur(10px);
+
+		transform: translateX(-100%);
+		transition: transform 0.25s ease;
+	}
+
+	.nav.open {
+		transform: translateX(0);
 	}
 }
 </style>
