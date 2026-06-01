@@ -8,6 +8,11 @@
 			text: "Overview of injunction coverage across wards and LADs."
 		},
 		{
+			id: "map2",
+			title: "Map 2",
+			text: "A section about the number of injunctions"
+		},
+		{
 			id: "stories",
 			title: "Stories",
 			text: "Individual accounts and impacts of injunctions."

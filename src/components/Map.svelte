@@ -85,7 +85,7 @@ let legend = $derived(legends[getView()]);
    MODE
 ----------------------------- */
 function updateModeFromScroll() {
-  const el = document.getElementById("stories");
+  const el = document.getElementById("map2");
   if (!el) return;
 
   const top = el.getBoundingClientRect().top;
