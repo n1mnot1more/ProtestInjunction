@@ -20,6 +20,7 @@ let introDone = false;
 const colorToLad = new Map();
 const colorToWard = new Map();
 
+
 let canvas;
 let hoverCanvas;
 
@@ -93,16 +94,37 @@ let legend = $derived(legends[getView()]);
 /* -----------------------------
    MODE
 ----------------------------- */
+const alpha = d3.scaleLinear()
+  .domain([0, 1])
+  .range([0, 1])
+  .clamp(true);
+
+
+let wardOrder = [];
+
+function prepareWardIntro() {
+  wardOrder = [...wards.features];
+
+  wardOrder.sort((a, b) =>
+    (a.properties.covered_area_ha || 0) -
+    (b.properties.covered_area_ha || 0)
+  );
+
+  wardOrder.forEach((f, i) => {
+    f.__introIndex = i;
+  });
+}
 
 function animateIntro() {
+  introProgress = 0;
+  introDone = false;
+
   const start = performance.now();
   const duration = 1400;
 
   function tick(t) {
     const raw = (t - start) / duration;
-    const eased = d3.easeCubicOut(Math.min(1, raw));
-
-    introProgress = eased;
+    introProgress = d3.easeCubicOut(Math.min(1.5, raw));
 
     drawBaseMap();
 
@@ -197,43 +219,40 @@ function getValue(feature) {
 function drawBaseMap() {
   context.clearRect(0, 0, width, height);
 
-context.save();
 
-context.translate(
-  zoomTransform.x,
-  zoomTransform.y + getYOffset() / zoomTransform.scale
-);
+  context.save();
 
-context.scale(
-	zoomTransform.scale,
-	zoomTransform.scale
-);
+  context.translate(zoomTransform.x, zoomTransform.y);
+  context.scale(zoomTransform.scale, zoomTransform.scale);
 
   context.beginPath();
   path(engwal);
   context.clip();
 
   const features =
-    geography === "ward"
-      ? wards.features
-      : lads.features;
+    geography === "ward" ? wards.features : [...lads.features];
 
   const view = getView();
 
-  for (const feature of features) {
-    context.beginPath();
-    path(feature);
+ for (const feature of features) {
 
-    context.fillStyle = scales[view](getValue(feature));
-    context.fill();
-  }
+  const t = feature.__introIndex / (wardOrder.length - 1);
+  if (geography === "ward" && !introDone && introProgress < t) continue;
+
+  context.globalAlpha = 1;
+
+  context.beginPath();
+  path(feature);
+  context.fillStyle = scales[view](getValue(feature));
+  context.fill();
+}
 
 
   context.beginPath();
   path(engwal);
 
   context.strokeStyle = "#262235";
-context.lineWidth = 4/ zoomTransform.scale;
+context.lineWidth = 3/ zoomTransform.scale;
   context.stroke();
   context.restore();
 }
@@ -395,7 +414,7 @@ function drawHover() {
 
 hoverContext.translate(
   zoomTransform.x,
-  zoomTransform.y + getYOffset() / zoomTransform.scale
+  zoomTransform.y 
 );
 
   hoverContext.scale(
@@ -563,7 +582,10 @@ wardHitContext.imageSmoothingEnabled = false;
 buildLadHitMap();
 buildWardHitMap();
 
+prepareWardIntro();
 drawBaseMap();
+animateIntro();
+
 
 window.addEventListener("scroll", updateModeFromScroll);
 
