@@ -704,19 +704,23 @@ if (geography === "ward") {
       </div>
     </div>
 
-  {:else if geography === "lad" && hovered}
-    <div class="tooltip"
-      style="left:{tooltipX + 20}px; top:{tooltipY - 10}px;"
-    >
+{:else if geography === "lad" && hovered}
+  <div class="tooltip"
+    style="left:{tooltipX + 20}px; top:{tooltipY - 10}px;"
+  >
 
-      <div>
-        {mode === "injunctions"
-          ? `${+hovered.properties["Injunction Names"] || 0} injuncted areas`
-          : `${Number(getValue(hovered) || 0).toFixed(2)} hectares injuncted`
-        }
-      </div>
+    <div>
+      {hovered.properties["LAD Name"] ?? "Unknown LAD"}
     </div>
-  {/if}
+
+    <div>
+      {mode === "injunctions"
+        ? `${+hovered.properties["Injunction Names"] || 0} injuncted areas`
+        : `${Number(getValue(hovered) || 0).toFixed(2)} hectares injuncted`
+      }
+    </div>
+  </div>
+{/if}
 
 
 

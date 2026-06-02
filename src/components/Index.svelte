@@ -4,12 +4,12 @@
 	const sections = [
 		{
 			id: "map",
-			title: "Map",
+			title: "Protest Injunctions Cover Large Areas of the UK",
 			text: "Overview of injunction coverage across wards and LADs."
 		},
 		{
 			id: "map2",
-			title: "Map 2",
+			title: "Many Areas are Impacted by different Protest Injunctions",
 			text: "A section about the number of injunctions"
 		},
 		{
@@ -115,7 +115,7 @@
 	flex-direction: column;
 	justify-content: center;
 	max-width: 40rem;
-	margin: 20vh 0;
+	margin: -3vh 0;
 }
 
 h2 {
