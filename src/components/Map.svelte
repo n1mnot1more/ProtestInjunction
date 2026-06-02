@@ -13,6 +13,10 @@ let wardHitContext;
 let hitPath;
 let wardHitPath;
 
+let introProgress = 0;
+let introDone = false;
+
+
 const colorToLad = new Map();
 const colorToWard = new Map();
 
@@ -28,6 +32,7 @@ let hoverPath;
 let wards;
 let lads;
 let engwal;
+
 
 let hovered = $state(null);
 let hoveredWard = $state(null);
@@ -49,8 +54,12 @@ let mode = $state("area");
 
 let geography = $state("ward");
 
-let scale = $state(1);
 
+ let zoomTransform = {
+  scale: 1,
+  x: 0,
+  y: 0
+};
 
 const legends = {
   ward_area: {
@@ -84,6 +93,29 @@ let legend = $derived(legends[getView()]);
 /* -----------------------------
    MODE
 ----------------------------- */
+
+function animateIntro() {
+  const start = performance.now();
+  const duration = 1400;
+
+  function tick(t) {
+    const raw = (t - start) / duration;
+    const eased = d3.easeCubicOut(Math.min(1, raw));
+
+    introProgress = eased;
+
+    drawBaseMap();
+
+    if (raw < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      introDone = true;
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
 function updateModeFromScroll() {
   const el = document.getElementById("map2");
   if (!el) return;
@@ -125,6 +157,10 @@ const injScale = d3.scaleThreshold()
     "#fff07a"
   ]);
 
+function getYOffset() {
+  return 5* (dpr || 1);
+}
+
 function getValue(feature) {
 
   if (mode === "injunctions") {
@@ -161,7 +197,17 @@ function getValue(feature) {
 function drawBaseMap() {
   context.clearRect(0, 0, width, height);
 
-  context.save();
+context.save();
+
+context.translate(
+  zoomTransform.x,
+  zoomTransform.y + getYOffset() / zoomTransform.scale
+);
+
+context.scale(
+	zoomTransform.scale,
+	zoomTransform.scale
+);
 
   context.beginPath();
   path(engwal);
@@ -182,27 +228,65 @@ function drawBaseMap() {
     context.fill();
   }
 
-  context.restore();
 
   context.beginPath();
   path(engwal);
 
   context.strokeStyle = "#262235";
-  context.lineWidth = 2;
+context.lineWidth = 4/ zoomTransform.scale;
   context.stroke();
+  context.restore();
 }
+
 
 
 /* -----------------------------
    HOVER
 ----------------------------- */
 
+function findLad(x, y) {
+
+  for (const feature of lads.features) {
+
+    hitContext.beginPath();
+    hitPath(feature);
+
+    if (hitContext.isPointInPath(
+      x * dpr,
+      y * dpr
+    )) {
+      return feature;
+    }
+  }
+
+  return null;
+}
+
+function findWard(x, y) {
+
+  for (const feature of wards.features) {
+
+    wardHitContext.beginPath();
+    wardHitPath(feature);
+
+    if (wardHitContext.isPointInPath(
+      x * dpr,
+      y * dpr
+    )) {
+      return feature;
+    }
+  }
+
+  return null;
+}
+
 function getFeatureAtPoint(x, y, ctx, colorMap) {
-  const radius = 2.5 ;
+const radius = 0;
+
   const size = radius * 2 + 1;
 
-  const px = Math.round(x * dpr);
-  const py = Math.round(y * dpr);
+const px = Math.floor(x * dpr);
+const py = Math.floor(y * dpr);
 
   const data = ctx.getImageData(
     px - radius,
@@ -249,6 +333,9 @@ function getFeatureAtPoint(x, y, ctx, colorMap) {
  
 
 function buildLadHitMap() {
+
+
+
   lads.features.forEach((feature, i) => {
     const r = (i + 1) & 255;
     const g = ((i + 1) >> 8) & 255;
@@ -265,7 +352,10 @@ function buildLadHitMap() {
   });
 }
 
+
 function buildWardHitMap() {
+
+
   wards.features.forEach((feature, i) => {
     const r = (i + 1) & 255;
     const g = ((i + 1) >> 8) & 255;
@@ -283,17 +373,42 @@ function buildWardHitMap() {
 }
 
 
+const zoom = d3.zoom()
+  .scaleExtent([1, 10])
+  .on("zoom", (event) => {
+
+    zoomTransform = {
+      scale: event.transform.k,
+      x: event.transform.x,
+      y: event.transform.y
+    };
+
+    drawBaseMap();
+    drawHover();
+  });
 
 function drawHover() {
 
   hoverContext.clearRect(0, 0, width, height);
+
+  hoverContext.save();
+
+hoverContext.translate(
+  zoomTransform.x,
+  zoomTransform.y + getYOffset() / zoomTransform.scale
+);
+
+  hoverContext.scale(
+    zoomTransform.scale,
+    zoomTransform.scale
+  );
 
   if (hoveredWard) {
     hoverContext.beginPath();
     hoverPath(hoveredWard);
 
     hoverContext.strokeStyle = "#fff";
-    hoverContext.lineWidth = 0.6;
+hoverContext.lineWidth = 0.8 / zoomTransform.scale;
     hoverContext.globalAlpha = 0.9;
     hoverContext.stroke();
   }
@@ -303,13 +418,16 @@ function drawHover() {
     hoverPath(hovered);
 
     hoverContext.strokeStyle = "#fff";
-    hoverContext.lineWidth = 1.2;
+hoverContext.lineWidth = 1.7 / zoomTransform.scale;
     hoverContext.globalAlpha = 1;
     hoverContext.stroke();
   }
 
   hoverContext.globalAlpha = 1;
+hoverContext.restore();
 }
+
+
 
 function getView() {
   return `${geography}_${mode}`;
@@ -354,11 +472,13 @@ function switchGeography(next) {
   }, 180);
 }
 
+
+
+
 /* -----------------------------
    INIT
 ----------------------------- */
 onMount(async () => {
-
 
   const mobile = window.innerWidth < 900;
 
@@ -391,7 +511,7 @@ onMount(async () => {
 projection = d3.geoIdentity()
   .reflectY(true)
   .fitExtent(
-    [[15, 15], [width - 15, height - 15]],
+    [[30, 30], [width - 25, height - 20]],
     wards
   );
 
@@ -409,6 +529,10 @@ hoverContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 path = d3.geoPath(projection, context);
 hoverPath = d3.geoPath(projection, hoverContext);
+
+
+d3.select(canvas).call(zoom);
+
 
 /* HIT CANVASES */
 
@@ -433,6 +557,9 @@ colorToWard.clear();
 hitPath = d3.geoPath(projection, hitContext);
 wardHitPath = d3.geoPath(projection, wardHitContext);
 
+hitContext.imageSmoothingEnabled = false;
+wardHitContext.imageSmoothingEnabled = false;
+
 buildLadHitMap();
 buildWardHitMap();
 
@@ -440,46 +567,40 @@ drawBaseMap();
 
 window.addEventListener("scroll", updateModeFromScroll);
 
+
+
 canvas.addEventListener("mousemove", (e) => {
 
   const rect = canvas.getBoundingClientRect();
 
-  const x =
-    ((e.clientX - rect.left) / rect.width) * width;
+const sx =
+  ((e.clientX - rect.left) / rect.width) * width;
 
-  const y =
-    ((e.clientY - rect.top) / rect.height) * height;
+const sy =
+  ((e.clientY - rect.top) / rect.height) * height;
+
+const x =
+  (sx - zoomTransform.x) /
+  zoomTransform.scale;
+
+const y =
+  (sy - zoomTransform.y) /
+  zoomTransform.scale;
 
   tooltipX = e.clientX - rect.left;
   tooltipY = e.clientY - rect.top;
 
 if (geography === "ward") {
 
-  hoveredWard = getFeatureAtPoint(
-    x,
-    y,
-    wardHitContext,
-    colorToWard
-  );
-
-  hovered = getFeatureAtPoint(
-    x,
-    y,
-    hitContext,
-    colorToLad
-  );
+  hoveredWard = findWard(x, y);
+  hovered = findLad(x, y);
 
 } else {
 
-  hovered = getFeatureAtPoint(
-    x,
-    y,
-    hitContext,
-    colorToLad
-  );
-
+  hovered = findLad(x, y);
   hoveredWard = null;
 }
+
   requestAnimationFrame(drawHover);
 });
 
@@ -487,18 +608,16 @@ if (geography === "ward") {
 });
 </script>
 
+
+
 <div class="map-wrap">
 
-  <div
-    class="canvas-stack"
-    style="
-      --opacity: {opacity};
-      --scale: {scale};
-    "
-  >
+  <div class="canvas-stack">
     <canvas bind:this={canvas} class="base" />
     <canvas bind:this={hoverCanvas} class="hover" />
   </div>
+
+</div>
 
   <canvas bind:this={hitCanvas} style="display:none;" />
   <canvas bind:this={wardHitCanvas} style="display:none;" />
@@ -518,6 +637,8 @@ if (geography === "ward") {
       Local Authority
     </button>
   </div>
+
+
 
 {#if legend}
 <div class="legend-bar">
@@ -565,7 +686,6 @@ if (geography === "ward") {
     <div class="tooltip"
       style="left:{tooltipX + 20}px; top:{tooltipY - 10}px;"
     >
-      <div>{hovered.properties["LAD Name"]}</div>
 
       <div>
         {mode === "injunctions"
@@ -576,7 +696,7 @@ if (geography === "ward") {
     </div>
   {/if}
 
-</div>
+
 
 <style>
 .map-wrap {
@@ -585,13 +705,25 @@ if (geography === "ward") {
   height: 100%;
 }
 
-.canvas-stack canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
+.canvas-stack {
+	position: absolute;
+	inset: 0 0 0 0;
+
+	opacity: var(--opacity, 1);
+
+	transition:
+		opacity 220ms ease,
+		transform 300ms ease;
+
+	z-index: 1;
 }
+
+@media (max-width: 900px) {
+  .canvas-stack {
+    inset: 0px 0 0 0;
+  }
+}
+
 
 canvas {
   position: absolute;
@@ -630,10 +762,14 @@ canvas {
 
 .geo-toggle button {
   background: none;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 0.7px solid rgba(255, 255, 255, 0.7);
   color: white;
+
   padding: 3px 8px;
-  font-size: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+
   cursor: pointer;
 }
 
@@ -642,19 +778,10 @@ canvas {
   font-weight: 600;
 }
 
-.canvas-stack {
-  position: absolute;
-  inset: 72px 0 0 0;
-  opacity: var(--opacity, 1);
-  transform: scale(var(--scale, 1));
-  transition: opacity 220ms ease;
-
-  z-index: 1; /* 👈 ADD */
-}
 
 @media (max-width: 900px) {
 	.canvas-stack {
-		inset: 64px 0 0 0; /* height of mobile header */
+		inset: 0 0 0 0; /* height of mobile header */
 	}
 }
 
