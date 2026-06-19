@@ -14,7 +14,7 @@ function enterSite() {
   let lastY = null;
 
   let drawing = false;
-  let unlocked = false;
+  let unlocked = true;
   let eraseAmount = 0;
 
 
@@ -31,7 +31,6 @@ function enterSite() {
   }
 
   function erase(event) {
-    if (!drawing) return;
 
     const rect = canvas.getBoundingClientRect();
     const point = event.touches?.[0] ?? event;
@@ -60,11 +59,8 @@ function enterSite() {
     lastX = x;
     lastY = y;
 
-    eraseAmount += 1;
-
-    if (eraseAmount > 95) {
       unlocked = true;
-    }
+
   }
 
   function drawInjunction() {
@@ -136,6 +132,14 @@ ctx.fillStyle = "rgba(255, 122, 26, 0.10)";
 The use of Protest Injunctions has been making protesting even more risky. Huge swathes of the UK are currently covered by these punitive court orders. Explore the geography of protest injunctions in England and Wales.
     </p>
 
+    <div class="cta1">
+      {#if unlocked}
+        <div class="hint">
+          ERASE INJUNCTION
+        </div>
+      {/if}
+    </div>
+
     <div class="widget">
       <canvas
         bind:this={canvas}
@@ -149,18 +153,15 @@ The use of Protest Injunctions has been making protesting even more risky. Huge 
       />
     </div>
 
-    <div class="cta">
-      {#if !unlocked}
-        <div class="hint">
-          <span class="arrow">↑</span><br />
-          ERASE INJUNCTION TO ENTER
-        </div>
-      {:else}
+    <div class="cta1">
+      {#if unlocked}
+
         <button on:click={enterSite}>
           Enter Website →
         </button>
       {/if}
     </div>
+
 
   </div>
 </div>
@@ -209,14 +210,14 @@ The use of Protest Injunctions has been making protesting even more risky. Huge 
 
 .intro {
   opacity: 0.85;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 /* canvas wrapper */
 .widget {
   display: flex;
   justify-content: center;
-  margin-bottom: 0.2rem;
+  margin-bottom: -1.2rem;
 }
 
 canvas {
@@ -226,15 +227,15 @@ canvas {
 }
 
 /* CTA BELOW CANVAS (CENTERED) */
-.cta {
-  margin-top: 0.1rem;
+.cta1 {
+  margin-top: 0.6rem;
   min-height: 70px; /* 👈 locks vertical space */
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.cta > * {
+.cta2 > * {
   display: flex;
   align-items: center;
   justify-content: center;

@@ -21,6 +21,13 @@ const colorToLad = new Map();
 const colorToWard = new Map();
 
 
+let geographyTransition = false;
+let transitionProgress = 0;
+
+
+let prevGeography = null;
+let transitionT = 0;
+
 let canvas;
 let hoverCanvas;
 
@@ -53,7 +60,9 @@ let projection;
 
 let mode = $state("area");
 
-let geography = $state("ward");
+let geography = $state("lad");
+let targetGeography = null;          // where we're going
+
 
 
  let zoomTransform = {
@@ -69,10 +78,14 @@ const legends = {
     colors: ["#61187a", "#b0349a", "#e04d79", "#fd842b", "#fec083", "#fcfd4f"]
   },
 
+  ward_injunctions: d3.scaleThreshold()
+    .domain([1, 3, 6, 10, 20, 36])
+    .range(["#0a061b","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"]),
+
   ward_injunctions: {
     title: "Ward – Number of Injunctions",
-    labels: [">0", "1", "3", "6", "10", "15", "20+"],
-    colors: ["#0a061b", "#2a0a3a", "#61187a", "#96308d", "#d3477d", "#fd842b", "#fcfd4f"]
+    labels: ["1", "3", "6", "10", "15+"],
+    colors: ["#61187a", "#96308d", "#d3477d", "#fd842b", "#fcfd4f"]
   },
 
   lad_area: {
@@ -115,6 +128,23 @@ function prepareWardIntro() {
   });
 }
 
+let LADOrder = [];
+
+function prepareLADIntro() {
+  LADOrder = [...lads.features];
+
+  LADOrder.sort((a, b) =>
+    (a.properties["Total Area Injuncted (ha)"] || 0) -
+    (b.properties["Total Area Injuncted (ha)"] || 0)
+  );
+
+  LADOrder.forEach((f, i) => {
+    f.__introIndex = i;
+  });
+}
+
+
+
 function animateIntro() {
   introProgress = 0;
   introDone = false;
@@ -138,18 +168,6 @@ function animateIntro() {
   requestAnimationFrame(tick);
 }
 
-function updateModeFromScroll() {
-  const el = document.getElementById("map2");
-  if (!el) return;
-
-  const top = el.getBoundingClientRect().top;
-
-  mode = top < window.innerHeight * 0.65
-    ? "injunctions"
-    : "area";
-
-  requestAnimationFrame(drawBaseMap);
-}
 
 /* -----------------------------
    SCALE
@@ -219,46 +237,140 @@ function getValue(feature) {
 function drawBaseMap() {
   context.clearRect(0, 0, width, height);
 
-
   context.save();
 
   context.translate(zoomTransform.x, zoomTransform.y);
   context.scale(zoomTransform.scale, zoomTransform.scale);
 
+  // clip to boundary
   context.beginPath();
   path(engwal);
   context.clip();
 
-  const features =
-    geography === "ward" ? wards.features : [...lads.features];
+  const viewFrom = `${prevGeography}_${mode}`;
+  const viewTo = `${geography}_${mode}`;
 
-  const view = getView();
+  const fromFeatures =
+    prevGeography === "ward" ? wards.features : lads.features;
 
- for (const feature of features) {
+  const toFeatures =
+    geography === "ward" ? wards.features : lads.features;
 
-  const t = feature.__introIndex / (wardOrder.length - 1);
-  if (geography === "ward" && !introDone && introProgress < t) continue;
+  const fromOrder = prevGeography === "lad" ? LADOrder : wardOrder;
+  const toOrder = geography === "lad" ? LADOrder : wardOrder;
 
+  // -----------------------------
+  // CASE 1: NORMAL (no transition)
+  // -----------------------------
+  if (!prevGeography) {
+    const features = toFeatures;
+
+    for (const feature of features) {
+      const t =
+        feature.__introIndex /
+        Math.max(1, toOrder.length - 1);
+
+      if (!introDone && introProgress < t) continue;
+
+      context.globalAlpha = 1;
+      context.beginPath();
+      path(feature);
+      context.fillStyle = scales[viewTo](getValue(feature));
+      context.fill();
+    }
+
+    context.globalAlpha = 1;
+    context.beginPath();
+    path(engwal);
+    context.strokeStyle = "#262235";
+    context.lineWidth = 3 / zoomTransform.scale;
+    context.stroke();
+
+    context.restore();
+    return;
+  }
+
+  // -----------------------------
+  // CASE 2: CROSSFADE
+  // -----------------------------
+
+  // draw OLD layer
+  context.globalAlpha = 1 - transitionT;
+
+  for (const feature of fromFeatures) {
+    const t =
+      feature.__introIndex /
+      Math.max(1, fromOrder.length - 1);
+
+    if (!introDone && introProgress < t) continue;
+
+    context.beginPath();
+    path(feature);
+    context.fillStyle = scales[viewFrom](getValue(feature));
+    context.fill();
+  }
+
+  // draw NEW layer
+  context.globalAlpha = transitionT;
+
+  for (const feature of toFeatures) {
+    const t =
+      feature.__introIndex /
+      Math.max(1, toOrder.length - 1);
+
+    if (!introDone && introProgress < t) continue;
+
+    context.beginPath();
+    path(feature);
+    context.fillStyle = scales[viewTo](getValue(feature));
+    context.fill();
+  }
+
+  // reset alpha
   context.globalAlpha = 1;
 
-  context.beginPath();
-  path(feature);
-  context.fillStyle = scales[view](getValue(feature));
-  context.fill();
-}
-
-
+  // outline
   context.beginPath();
   path(engwal);
-
   context.strokeStyle = "#262235";
-context.lineWidth = 3/ zoomTransform.scale;
+  context.lineWidth = 3 / zoomTransform.scale;
   context.stroke();
+
   context.restore();
 }
 
+function switchGeography(next) {
+  if (geography === next || transitioning) return;
 
+  transitioning = true;
 
+  prevGeography = geography;
+  targetGeography = next;
+
+  const start = performance.now();
+  const duration = 350;
+
+  function tick(t) {
+    const raw = Math.min(1, (t - start) / duration);
+    transitionT = d3.easeCubicInOut(raw);
+
+    drawBaseMap();
+
+    if (raw < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      geography = targetGeography;   // commit only at end
+      targetGeography = null;
+      prevGeography = null;
+      transitionT = 0;
+      transitioning = false;
+
+      drawBaseMap();
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
 /* -----------------------------
    HOVER
 ----------------------------- */
@@ -458,8 +570,8 @@ const scales = {
     .range(["#0a061b","#61187a","#b0349a","#e04d79","#fd842b","#fec083","#fcfd4f"]),
 
   ward_injunctions: d3.scaleThreshold()
-    .domain([1, 3, 6, 10, 15, 20, 25, 34])
-    .range(["#0a061b","#2a0a3a","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"]),
+    .domain([1, 3, 6, 10, 20, 36])
+    .range(["#0a061b","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"]),
 
   lad_area: d3.scaleThreshold()
     .domain([0.0001, 5, 20, 100, 500, 1000, 2000])
@@ -470,26 +582,6 @@ const scales = {
     .range(["#0a061b","#2a0a3a","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"])
 };
 
-function switchGeography(next) {
-  if (geography === next || transitioning) return;
-
-  transitioning = true;
-  opacity = 0.2;
-
-  setTimeout(() => {
-    geography = next;
-
-    drawBaseMap();
-
-    requestAnimationFrame(() => {
-      opacity = 1;
-    });
-
-    setTimeout(() => {
-      transitioning = false;
-    }, 220);
-  }, 180);
-}
 
 
 
@@ -583,11 +675,10 @@ buildLadHitMap();
 buildWardHitMap();
 
 prepareWardIntro();
+prepareLADIntro();
 drawBaseMap();
 animateIntro();
 
-
-window.addEventListener("scroll", updateModeFromScroll);
 
 
 
@@ -634,7 +725,10 @@ if (geography === "ward") {
 
 <div class="map-wrap">
 
-  <div class="canvas-stack">
+
+<div
+  class="canvas-stack"
+>
     <canvas bind:this={canvas} class="base" />
     <canvas bind:this={hoverCanvas} class="hover" />
   </div>
@@ -644,7 +738,8 @@ if (geography === "ward") {
   <canvas bind:this={hitCanvas} style="display:none;" />
   <canvas bind:this={wardHitCanvas} style="display:none;" />
 
-  <div class="geo-toggle">
+<div class="geo-toggle">
+  <div class="toggle-row">
     <button
       class:selected={geography === "ward"}
       on:click={() => switchGeography("ward")}
@@ -660,7 +755,28 @@ if (geography === "ward") {
     </button>
   </div>
 
+  <div class="toggle-row">
+    <button
+      class:selected={mode === "area"}
+      on:click={() => {
+        mode = "area";
+        drawBaseMap();
+      }}
+    >
+      Hectares
+    </button>
 
+    <button
+      class:selected={mode === "injunctions"}
+      on:click={() => {
+        mode = "injunctions";
+        drawBaseMap();
+      }}
+    >
+      Counts
+    </button>
+  </div>
+</div>
 
 {#if legend}
 <div class="legend-bar">
@@ -735,13 +851,13 @@ if (geography === "ward") {
 	position: absolute;
 	inset: 0 0 0 0;
 
-	opacity: var(--opacity, 1);
 
 	transition:
-		opacity 220ms ease,
-		transform 300ms ease;
+		opacity 400ms ease,
+		transform 600ms ease;
 
 	z-index: 1;
+
 }
 
 @media (max-width: 900px) {
@@ -782,13 +898,17 @@ canvas {
   right: 12px;
   z-index: 20;
 
-  display: flex;
-  gap: 6px;
+display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end; /* THIS is the key */
+
 }
+
 
 .geo-toggle button {
   background: none;
-  border: 0.7px solid rgba(255, 255, 255, 0.7);
+  border: 0.7px solid white;
   color: white;
 
   padding: 3px 8px;
@@ -797,12 +917,24 @@ canvas {
   letter-spacing: 0.02em;
 
   cursor: pointer;
+
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .geo-toggle button.selected {
-  border-color: white;
-  font-weight: 600;
+	background: rgba(255,255,255,0.10);
+	border-color: rgba(252,253,79,0.55);
+	color: #fcfd4f;
+
 }
+
+
+
+.toggle-row {
+  display: flex;
+  gap: 6px;
+}
+
 
 
 @media (max-width: 900px) {
@@ -817,12 +949,12 @@ canvas {
   left: 0;
   right: 0;
 
-  height: 130px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
 
-  padding: 0 1.5rem;
+  padding: 0 1.2rem;
   z-index: 10;
 
   /* REMOVE THIS */
@@ -840,6 +972,7 @@ canvas {
   text-shadow: 0 1px 3px rgba(0,0,0,0.85),
                0 0 8px rgba(0,0,0,0.6);
 }
+
 
 .legend-title {
   font-weight: 600;

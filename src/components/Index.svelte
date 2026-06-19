@@ -115,7 +115,7 @@
 	flex-direction: column;
 	justify-content: center;
 	max-width: 40rem;
-	margin: -3vh 0;
+	margin: 0;
 }
 
 h2 {

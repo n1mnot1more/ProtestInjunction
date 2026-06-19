@@ -96,16 +96,15 @@
 /* DESKTOP LOGO */
 
 .nav-logo {
-	display: flex;
-	align-items: center;
+		display: block;
 
-	max-width: 3.2em;
+		position: fixed;
+		top: 1 rem;
+		left: 1.5rem;
 
-	margin-right: 0.4rem;
+		width: 3.3rem;
 
-	opacity: 0.85;
-
-	transition: opacity 0.2s ease;
+		z-index: 1002;
 }
 
 .nav-logo:hover {

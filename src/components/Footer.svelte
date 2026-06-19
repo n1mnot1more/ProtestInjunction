@@ -172,7 +172,7 @@ href={
 	.c {
 		max-width: calc(var(--width-column-wide, 1280px) - var(--margin, 16px) * 2);
 		padding: 16px;
-		margin: 32px auto 100px auto;
+		margin: 0px auto 0px auto;
 		font-family: var(--font-sans);
 	}
 
@@ -199,7 +199,7 @@ href={
 		padding: 0;
 		display: flex;
 		margin: 0 auto;
-		gap: 32px;
+		gap: 0px;
 	}
 
 	.images ul {
