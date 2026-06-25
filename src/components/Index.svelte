@@ -1,60 +1,74 @@
 <script>
 	import Map from "../components/Map.svelte";
+	import { onMount } from "svelte";
 
-	const sections = [
-		{
-			id: "map",
-			title: "Protest Injunctions Cover Large Areas of the UK",
-			text: "Overview of injunction coverage across wards and LADs."
-		},
-		{
-			id: "map2",
-			title: "Many Areas are Impacted by different Protest Injunctions",
-			text: "A section about the number of injunctions"
-		},
-		{
-			id: "stories",
-			title: "Stories",
-			text: "Individual accounts and impacts of injunctions."
-		},
-		{
-			id: "resources",
-			title: "Resources",
-			text: "Further reading, datasets, and methodology."
-		},
-		{
-			id: "acknowledgements",
-			title: "Acknowledgements",
-			text: "Credits, collaborators, and data sources."
-		}
-	];
+	let showHS2 = false;
+
+	onMount(() => {
+		const el = document.getElementById("map2");
+
+		const obs = new IntersectionObserver(([entry]) => {
+			showHS2 = entry.isIntersecting;
+		}, { threshold: 0.5 });
+
+		if (el) obs.observe(el);
+
+		return () => obs.disconnect();
+	});
 </script>
 
 <div class="page">
 
-	<!-- LEFT MAP -->
 	<div class="map-column">
-
-		<!-- MAP -->
 		<div class="map-sticky">
-			<Map />
+<Map hs2Visible={showHS2} />
 		</div>
-
 	</div>
 
-	<!-- RIGHT TEXT -->
 	<div class="text-column">
 
-		{#each sections as section}
-			<section class="step" id={section.id}>
-				<h2>{section.title}</h2>
-				<p>{section.text}</p>
-			</section>
-		{/each}
+		<section class="step" id="map">
+			<h1> Protest Injunctions Across England and Wales</h1>
 
+			<p>
+				Interactive exploration of protest injunctions and the
+				areas they affect.
+			</p>
+
+		</section>
+
+
+		<section class="step">
+			<h2>
+				Protest Activities Targeted
+			</h2>
+
+			<p>
+				text
+			</p>
+		</section>
+
+		<section class="step" id="map2">
+			<h2>
+				The HS2 injunction
+			</h2>
+
+			<p>
+				Something on the HS2 injunction. Map zooms into injected area
+			</p>
+
+
+			<div class="links">
+				<a href="/stories">Stories →</a>
+				<a href="/resources">Resources →</a>
+				<a href="/credits">Credits →</a>
+			</div>
+
+		</section>
 	</div>
 
 </div>
+
 
 <style>
 
@@ -66,6 +80,7 @@
 }
 
 /* LEFT SIDE */
+
 .map-column {
 	width: 60vw;
 	display: flex;
@@ -74,20 +89,6 @@
 	position: relative;
 }
 
-/* LEGEND BAR */
-.legend-bar {
-	height: 10px;
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	padding: 0 1.5rem;
-	position: sticky;
-	top: 0;
-	z-index: 30;
-	background: #0a061b;
-}
-
-/* MAP AREA */
 .map-sticky {
 	position: sticky;
 	top: 10px;
@@ -99,9 +100,8 @@
 	background: #0a061b;
 }
 
+/* RIGHT SIDE */
 
-
-/* RIGHT TEXT */
 .text-column {
 	width: 40vw;
 	padding: 0 3rem;
@@ -115,9 +115,9 @@
 	flex-direction: column;
 	justify-content: center;
 	max-width: 40rem;
-	margin: 0;
 }
 
+h1,
 h2 {
 	font-size: 2rem;
 	margin-bottom: 1rem;
@@ -129,7 +129,26 @@ p {
 	color: #d0d0d0;
 }
 
+.links {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-top: 2rem;
+}
+
+.links a {
+	color: white;
+	text-decoration: none;
+	font-weight: 600;
+	font-size: 1rem;
+}
+
+.links a:hover {
+	text-decoration: underline;
+}
+
 /* MOBILE */
+
 @media (max-width: 900px) {
 
 	.page {
@@ -146,7 +165,6 @@ p {
 		z-index: 0;
 		pointer-events: none;
 	}
-
 
 	.map-sticky {
 		position: absolute;
@@ -174,6 +192,7 @@ p {
 		border-radius: 12px;
 	}
 
+	h1,
 	h2 {
 		font-size: 1.6rem;
 	}

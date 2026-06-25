@@ -4,6 +4,58 @@ import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import { onMount } from "svelte";
 
+let {
+  hs2Visible = false,
+  animateOnLoad = true
+} = $props();
+
+let hs2HasLockedView = false;
+
+let canvasSelection;
+let zoomLocked = false;
+
+let zoomSession = 0;
+let zoomPhase = "idle"; // "zooming" | "done"
+
+let hs2Injunction;
+
+
+$effect(() => {
+  if (!hs2Visible) {
+    hs2HasLockedView = false;
+    animateZoom(1, 0, 0, true);
+    return;
+  }
+
+  if (!hs2Injunction || !path || !context || !width || !height) return;
+  if (hs2HasLockedView) return; // 👈 prevents re-zooming every reactive tick
+
+  const bounds = path.bounds(hs2Injunction);
+  if (!bounds) return;
+
+  const dx = bounds[1][0] - bounds[0][0];
+  const dy = bounds[1][1] - bounds[0][1];
+
+  const cx = (bounds[0][0] + bounds[1][0]) / 2;
+  const cy = (bounds[0][1] + bounds[1][1]) / 2;
+
+  const scale = Math.min(width / dx, height / dy) * 0.6;
+
+  const x = width / 2 - scale * cx;
+  const y = height / 2 - scale * cy;
+
+  hs2HasLockedView = true;
+
+  animateZoom(scale, x, y, true);
+});
+
+$effect(() => {
+  if (!hs2Visible) {
+    animateZoom(1, 0, 0);
+  }
+});
+
+
 let hitCanvas;
 let wardHitCanvas;
 
@@ -64,12 +116,13 @@ let geography = $state("lad");
 let targetGeography = null;          // where we're going
 
 
-
  let zoomTransform = {
   scale: 1,
   x: 0,
   y: 0
 };
+
+
 
 const legends = {
   ward_area: {
@@ -154,7 +207,7 @@ function animateIntro() {
 
   function tick(t) {
     const raw = (t - start) / duration;
-    introProgress = d3.easeCubicOut(Math.min(1.5, raw));
+    introProgress = d3.easeSinOut(Math.min(1.5, raw));
 
     drawBaseMap();
 
@@ -169,6 +222,64 @@ function animateIntro() {
 }
 
 
+function animateZoom(scale, x, y, lock = false) {
+  if (lock) zoomLocked = true;
+
+  zoomPhase = "zooming";
+  const session = ++zoomSession;
+
+  const start = { ...zoomTransform };
+  const startTime = performance.now();
+  const duration = 1100;
+
+  function tick(t) {
+    const p = Math.min(1, (t - startTime) / duration);
+    const e = d3.easeSinOut(p);
+
+    zoomTransform = {
+      scale: start.scale + (scale - start.scale) * e,
+      x: start.x + (x - start.x) * e,
+      y: start.y + (y - start.y) * e
+    };
+
+    drawBaseMap();
+    drawHover();
+
+    if (p < 1) {
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    // ignore stale animations
+    if (session !== zoomSession) return;
+
+    // commit exact final transform
+    zoomTransform = { scale, x, y };
+
+    drawBaseMap();
+    drawHover();
+
+    zoomPhase = "done";
+
+    // IMPORTANT:
+    // update D3's internal zoom state so
+    // panning/wheel zoom starts from this view
+    const finalTransform = d3.zoomIdentity
+      .translate(x, y)
+      .scale(scale);
+
+    zoomLocked = false;
+
+    if (canvasSelection) {
+      canvasSelection.call(
+        zoom.transform,
+        finalTransform
+      );
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
 /* -----------------------------
    SCALE
 ----------------------------- */
@@ -279,11 +390,27 @@ function drawBaseMap() {
       context.fill();
     }
 
+/* HS2 INJUNCTION */
+
+if (hs2Injunction && hs2Visible && zoomPhase === "done") {
+  context.beginPath();
+  path(hs2Injunction);
+
+  context.fillStyle = "rgba(60, 190, 120, 0.24)";
+  context.fill();
+
+  context.shadowColor = "#6D9733";
+  context.shadowBlur = 20;
+
+  context.strokeStyle = "#96FA42";
+  context.lineWidth = 2 / zoomTransform.scale;
+  context.stroke();
+}
     context.globalAlpha = 1;
     context.beginPath();
     path(engwal);
     context.strokeStyle = "#262235";
-    context.lineWidth = 3 / zoomTransform.scale;
+    context.lineWidth = 1 / zoomTransform.scale;
     context.stroke();
 
     context.restore();
@@ -333,7 +460,7 @@ function drawBaseMap() {
   context.beginPath();
   path(engwal);
   context.strokeStyle = "#262235";
-  context.lineWidth = 3 / zoomTransform.scale;
+  context.lineWidth = 2 / zoomTransform.scale;
   context.stroke();
 
   context.restore();
@@ -352,7 +479,7 @@ function switchGeography(next) {
 
   function tick(t) {
     const raw = Math.min(1, (t - start) / duration);
-    transitionT = d3.easeCubicInOut(raw);
+    transitionT = d3.easeSinOut(raw);
 
     drawBaseMap();
 
@@ -503,10 +630,12 @@ function buildWardHitMap() {
   });
 }
 
-
 const zoom = d3.zoom()
   .scaleExtent([1, 10])
+  .wheelDelta(event => -event.deltaY * 0.004)
   .on("zoom", (event) => {
+
+    if (zoomLocked) return; // 👈 ADD THIS
 
     zoomTransform = {
       scale: event.transform.k,
@@ -517,6 +646,7 @@ const zoom = d3.zoom()
     drawBaseMap();
     drawHover();
   });
+
 
 function drawHover() {
 
@@ -591,6 +721,7 @@ const scales = {
 ----------------------------- */
 onMount(async () => {
 
+
   const mobile = window.innerWidth < 900;
 
   width = mobile ? window.innerWidth : window.innerWidth * 0.6;
@@ -618,6 +749,20 @@ onMount(async () => {
     engwalTopo.objects[Object.keys(engwalTopo.objects)[0]]
   );
 
+const hs2Topo = await d3.json(
+  `${base}/hs2injunction.topo.json`
+);
+
+hs2Injunction = topojson.feature(
+  hs2Topo,
+  hs2Topo.objects[
+    Object.keys(hs2Topo.objects)[0]
+  ]
+);
+
+console.log(hs2Injunction);
+console.log(hs2Injunction.type);
+
 
 projection = d3.geoIdentity()
   .reflectY(true)
@@ -644,6 +789,8 @@ hoverPath = d3.geoPath(projection, hoverContext);
 
 d3.select(canvas).call(zoom);
 
+canvasSelection = d3.select(canvas);
+canvasSelection.call(zoom); 
 
 /* HIT CANVASES */
 
@@ -676,8 +823,16 @@ buildWardHitMap();
 
 prepareWardIntro();
 prepareLADIntro();
+
 drawBaseMap();
-animateIntro();
+
+if (animateOnLoad) {
+  animateIntro();
+} else {
+  introDone = true;
+  introProgress = 1;
+  drawBaseMap();
+}
 
 
 

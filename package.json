@@ -43,7 +43,9 @@
 	"browserslist": "> 0.5%, last 4 versions, not ie <= 11, not ie_mob <= 11",
 	"dependencies": {
 		"d3-geo-projection": "^4.0.0",
+		"install": "^0.13.0",
 		"mapshaper": "^0.7.17",
+		"npm": "^11.17.0",
 		"simplify-geojson": "^1.0.5",
 		"topojson-client": "^3.1.0",
 		"world-atlas": "^2.0.2"

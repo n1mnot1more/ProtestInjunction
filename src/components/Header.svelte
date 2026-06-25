@@ -2,12 +2,12 @@
 	import { base } from "$app/paths";
 	import wordmark from "$svg/Not1More.svg";
 
-	const nav = [
-		{ id: "map", label: "Map" },
-		{ id: "stories", label: "Stories" },
-		{ id: "resources", label: "Resources" },
-		{ id: "acknowledgements", label: "Credits" }
-	];
+const nav = [
+	{ href: "/map", label: "Map" },
+	{ href: "/stories", label: "Stories" },
+	{ href: "/resources", label: "Resources" },
+	{ href: "/credits", label: "Credits" }
+];
 
 	let active = "map";
 	let open = false;
@@ -57,14 +57,14 @@
 			{@html wordmark}
 		</a>
 
-		{#each nav as item}
-			<button
-				class:selected={active === item.id}
-				on:click={() => goTo(item.id)}
-			>
-				{item.label}
-			</button>
-		{/each}
+{#each nav as item}
+	<a
+		href={`${base}${item.href}`}
+		class="nav-button"
+	>
+		{item.label}
+	</a>
+{/each}
 
 	</nav>
 
@@ -78,6 +78,47 @@
 }
 
 /* DESKTOP NAV */
+
+.nav-button {
+	background: rgba(18, 12, 34, 0.82);
+
+	backdrop-filter: blur(10px);
+
+	border: 1px solid rgba(255,255,255,0.08);
+
+	color: rgba(255,255,255,0.82);
+
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+
+	padding: 0.5rem 0.9rem;
+
+	border-radius: 999px;
+
+	cursor: pointer;
+
+	text-decoration: none;
+
+	box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+
+	transition:
+		transform 0.18s ease,
+		background 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease;
+}
+
+.nav-button:hover {
+	transform: translateY(-1px);
+	background: rgba(40, 22, 70, 0.92);
+	border-color: rgba(255,255,255,0.16);
+	color: white;
+}
+
+
+
 
 .nav {
 	position: fixed;
