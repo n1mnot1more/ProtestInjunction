@@ -21,7 +21,7 @@
 		<section class="hero">
 			<p class="eyebrow">Stories</p>
 
-			<h1> Stories About Injuncted Areas</h1>
+			<h1>Injunction Stories</h1>
 
 			<p class="standfirst">
 				Accounts from people affected by protest injunctions across England and Wales.
@@ -81,7 +81,7 @@ h1 {
 .standfirst {
 	font-size: 1.25rem;
 	color: #d0d0d0;
-	max-width: 40rem;
+	max-width: 60rem;
 }
 
 .story {

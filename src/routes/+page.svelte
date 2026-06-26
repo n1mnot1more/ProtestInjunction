@@ -228,8 +228,9 @@ canvas {
 
 /* CTA BELOW CANVAS (CENTERED) */
 .cta1 {
+  width: 100%;
   margin-top: 0.6rem;
-  min-height: 70px; /* 👈 locks vertical space */
+  min-height: 70px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -277,6 +278,8 @@ button {
   cursor: pointer;
   line-height: 1; /* 👈 important */
 }
+
+
 
 /* animation */
 @keyframes pulseHint {
