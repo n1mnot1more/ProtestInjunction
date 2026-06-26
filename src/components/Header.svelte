@@ -1,14 +1,19 @@
 <script>
-	import { base } from "$app/paths";
-	import wordmark from "$svg/Not1More.svg";
+import { base } from "$app/paths";
+import { activePanel } from "$lib/stores/panel";
+import wordmark from "$svg/Not1More.svg";
 
 const nav = [
-	{ href: "/map", label: "Map" },
-	{ href: "/stories", label: "Stories" },
-	{ href: "/resources", label: "Resources" },
-	{ href: "/credits", label: "Credits" }
+	{ type: "panel", panel: "map", label: "Map" },
+	{ type: "panel", panel: "stories", label: "Stories" },
+	{ type: "panel", panel: "resources", label: "Resources" },
+	{ type: "panel", panel: "credits", label: "Credits" }
 ];
 
+function openPanel(panel) {
+	activePanel.set(panel);
+	open = false;
+}
 	let active = "map";
 	let open = false;
 
@@ -58,12 +63,12 @@ const nav = [
 		</a>
 
 {#each nav as item}
-	<a
-		href={`${base}${item.href}`}
+	<button
 		class="nav-button"
+		on:click={() => activePanel.set(item.panel)}
 	>
 		{item.label}
-	</a>
+	</button>
 {/each}
 
 	</nav>
@@ -308,6 +313,18 @@ const nav = [
 		width: 100%;
 		text-align: left;
 	}
+}
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: transparent;
+}
+body {
+  background: #0a061b;
 }
 
 </style>

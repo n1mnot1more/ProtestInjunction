@@ -4,6 +4,12 @@ import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import { onMount } from "svelte";
 
+let hs2Cached;
+
+let hoverScheduled = false;
+let pendingEvent = null;
+
+
 let {
   hs2Visible = false,
   animateOnLoad = true
@@ -27,8 +33,8 @@ $effect(() => {
     return;
   }
 
-  if (!hs2Injunction || !path || !context || !width || !height) return;
-  if (hs2HasLockedView) return; // 👈 prevents re-zooming every reactive tick
+  if (!hs2Injunction || !path || !width || !height || !projection) return;
+  if (!hs2Cached) return;
 
   const bounds = path.bounds(hs2Injunction);
   if (!bounds) return;
@@ -44,17 +50,13 @@ $effect(() => {
   const x = width / 2 - scale * cx;
   const y = height / 2 - scale * cy;
 
-  hs2HasLockedView = true;
-
   animateZoom(scale, x, y, true);
 });
 
 $effect(() => {
-  if (!hs2Visible) {
-    animateZoom(1, 0, 0);
-  }
+  if (!hs2Injunction || !projection) return;
+  buildHS2Cache();
 });
-
 
 let hitCanvas;
 let wardHitCanvas;
@@ -132,13 +134,13 @@ const legends = {
   },
 
   ward_injunctions: d3.scaleThreshold()
-    .domain([1, 3, 6, 10, 20, 36])
-    .range(["#0a061b","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"]),
+    .domain([0, 1, 3, 6, 10, 20, 36])
+    .range(["#0a061b","#0a061b","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"]),
 
   ward_injunctions: {
     title: "Ward – Number of Injunctions",
-    labels: ["1", "3", "6", "10", "15+"],
-    colors: ["#61187a", "#96308d", "#d3477d", "#fd842b", "#fcfd4f"]
+    labels: ["0", "1", "3", "6", "10", "15+"],
+    colors: ["#0a061b", "#61187a", "#96308d", "#d3477d", "#fd842b", "#fcfd4f"]
   },
 
   lad_area: {
@@ -149,7 +151,7 @@ const legends = {
 
   lad_injunctions: {
     title: "LAD – Number of Injunctions",
-    labels: ["1", "2", "5", "10", "20", "50", "100+"],
+    labels: ["0", "1", "2", "5", "10", "20", "50+"],
     colors: ["#0a061b", "#2a0a3a", "#61187a", "#96308d", "#d3477d", "#fd842b", "#fcfd4f"]
   }
 };
@@ -172,8 +174,8 @@ function prepareWardIntro() {
   wardOrder = [...wards.features];
 
   wardOrder.sort((a, b) =>
-    (a.properties.covered_area_ha || 0) -
-    (b.properties.covered_area_ha || 0)
+    (a.properties.covered_area_ha_rounded || 0) -
+    (b.properties.covered_area_ha_rounded || 0)
   );
 
   wardOrder.forEach((f, i) => {
@@ -187,15 +189,14 @@ function prepareLADIntro() {
   LADOrder = [...lads.features];
 
   LADOrder.sort((a, b) =>
-    (a.properties["Total Area Injuncted (ha)"] || 0) -
-    (b.properties["Total Area Injuncted (ha)"] || 0)
+    (a.properties["Total.Area.Injuncted..ha."] || 0) -
+    (b.properties["Total.Area.Injuncted..ha."] || 0)
   );
 
   LADOrder.forEach((f, i) => {
     f.__introIndex = i;
   });
 }
-
 
 
 function animateIntro() {
@@ -215,6 +216,9 @@ function animateIntro() {
       requestAnimationFrame(tick);
     } else {
       introDone = true;
+
+      introProgress = 1;
+      drawBaseMap();
     }
   }
 
@@ -264,18 +268,15 @@ function animateZoom(scale, x, y, lock = false) {
     // IMPORTANT:
     // update D3's internal zoom state so
     // panning/wheel zoom starts from this view
-    const finalTransform = d3.zoomIdentity
-      .translate(x, y)
-      .scale(scale);
+const finalTransform = d3.zoomIdentity
+  .translate(x, y)
+  .scale(scale);
 
-    zoomLocked = false;
+canvasSelection.interrupt(); // cancel any transitions
 
-    if (canvasSelection) {
-      canvasSelection.call(
-        zoom.transform,
-        finalTransform
-      );
-    }
+canvasSelection.call(zoom.transform, finalTransform);
+
+zoomLocked = false;
   }
 
   requestAnimationFrame(tick);
@@ -319,7 +320,7 @@ function getValue(feature) {
     if (geography === "lad") {
       return Math.max(
         0,
-        +feature.properties["Injunction Names"] || 0
+        +feature.properties["Injunction.Names"] || 0
       );
     }
 
@@ -332,13 +333,13 @@ function getValue(feature) {
   if (geography === "lad") {
     return Math.max(
       0,
-      +feature.properties["Total Area Injuncted (ha)"] || 0
+      +feature.properties["Total.Area.Injuncted..ha."] || 0
     );
   }
 
   return Math.max(
     0,
-    +feature.properties.covered_area_ha || 0
+    +feature.properties.covered_area_ha_rounded || 0
   );
 }
 
@@ -371,15 +372,14 @@ function drawBaseMap() {
   const toOrder = geography === "lad" ? LADOrder : wardOrder;
 
   // -----------------------------
-  // CASE 1: NORMAL (no transition)
+  // CASE 1: NORMAL
   // -----------------------------
   if (!prevGeography) {
     const features = toFeatures;
 
     for (const feature of features) {
       const t =
-        feature.__introIndex /
-        Math.max(1, toOrder.length - 1);
+        feature.__introIndex / Math.max(1, toOrder.length - 1);
 
       if (!introDone && introProgress < t) continue;
 
@@ -390,22 +390,22 @@ function drawBaseMap() {
       context.fill();
     }
 
-/* HS2 INJUNCTION */
+// HS2 INJUNCTION (cached version)
+if (hs2Injunction && hs2Visible && zoomPhase === "done" && hs2Cached) {
 
-if (hs2Injunction && hs2Visible && zoomPhase === "done") {
-  context.beginPath();
-  path(hs2Injunction);
+  context.save();
 
-  context.fillStyle = "rgba(60, 190, 120, 0.24)";
-  context.fill();
+  context.shadowColor = "#1fe4ff";
+  context.shadowBlur = 17;
 
-  context.shadowColor = "#6D9733";
-  context.shadowBlur = 20;
-
-  context.strokeStyle = "#96FA42";
+  context.strokeStyle = "#ddfdff";
   context.lineWidth = 2 / zoomTransform.scale;
-  context.stroke();
+
+  context.stroke(hs2Cached);
+
+  context.restore();
 }
+
     context.globalAlpha = 1;
     context.beginPath();
     path(engwal);
@@ -413,57 +413,101 @@ if (hs2Injunction && hs2Visible && zoomPhase === "done") {
     context.lineWidth = 1 / zoomTransform.scale;
     context.stroke();
 
-    context.restore();
-    return;
-  }
+  } else {
+    // -----------------------------
+    // CASE 2: CROSSFADE
+    // -----------------------------
 
-  // -----------------------------
-  // CASE 2: CROSSFADE
-  // -----------------------------
+    // OLD layer
+    context.globalAlpha = 1 - transitionT;
 
-  // draw OLD layer
-  context.globalAlpha = 1 - transitionT;
+    for (const feature of fromFeatures) {
+      const t =
+        feature.__introIndex / Math.max(1, fromOrder.length - 1);
 
-  for (const feature of fromFeatures) {
-    const t =
-      feature.__introIndex /
-      Math.max(1, fromOrder.length - 1);
+      if (!introDone && introProgress < t) continue;
 
-    if (!introDone && introProgress < t) continue;
+      context.beginPath();
+      path(feature);
+      context.fillStyle = scales[viewFrom](getValue(feature));
+      context.fill();
+    }
+
+    // NEW layer
+    context.globalAlpha = transitionT;
+
+    for (const feature of toFeatures) {
+      const t =
+        feature.__introIndex / Math.max(1, toOrder.length - 1);
+
+      if (!introDone && introProgress < t) continue;
+
+      context.beginPath();
+      path(feature);
+      context.fillStyle = scales[viewTo](getValue(feature));
+      context.fill();
+    }
+
+    context.globalAlpha = 1;
 
     context.beginPath();
-    path(feature);
-    context.fillStyle = scales[viewFrom](getValue(feature));
-    context.fill();
+    path(engwal);
+    context.strokeStyle = "#262235";
+    context.lineWidth = 1 / zoomTransform.scale;
+    context.stroke();
   }
 
-  // draw NEW layer
-  context.globalAlpha = transitionT;
+  // =========================================================
+  // SUBTLE BOUNDARIES (WARD + LAD — background hierarchy)
+  // =========================================================
+if (zoomPhase === "done") {
 
-  for (const feature of toFeatures) {
-    const t =
-      feature.__introIndex /
-      Math.max(1, toOrder.length - 1);
+  context.save();
 
-    if (!introDone && introProgress < t) continue;
+  context.lineJoin = "round";
+  context.lineCap = "round";
 
-    context.beginPath();
-    path(feature);
-    context.fillStyle = scales[viewTo](getValue(feature));
-    context.fill();
+  const wardStroke = {
+    color: "#101018",
+    alpha: 0.08,
+    width: 0.8
+  };
+
+  const ladStroke = {
+    color: "#101018",
+    alpha: 0.08,
+    width: 0.8
+  };
+
+  if (geography === "ward") {
+    context.globalAlpha = wardStroke.alpha;
+    context.strokeStyle = wardStroke.color;
+    context.lineWidth = wardStroke.width / zoomTransform.scale;
+
+    for (const feature of wards.features) {
+      context.beginPath();
+      path(feature);
+      context.stroke();
+    }
   }
 
-  // reset alpha
-  context.globalAlpha = 1;
+  if (geography === "lad") {
+    context.globalAlpha = ladStroke.alpha;
+    context.strokeStyle = ladStroke.color;
+    context.lineWidth = ladStroke.width / zoomTransform.scale;
 
-  // outline
-  context.beginPath();
-  path(engwal);
-  context.strokeStyle = "#262235";
-  context.lineWidth = 2 / zoomTransform.scale;
-  context.stroke();
+    for (const feature of lads.features) {
+      context.beginPath();
+      path(feature);
+      context.stroke();
+    }
+  }
 
   context.restore();
+}
+
+  context.restore();
+  return;
 }
 
 function switchGeography(next) {
@@ -635,7 +679,7 @@ const zoom = d3.zoom()
   .wheelDelta(event => -event.deltaY * 0.004)
   .on("zoom", (event) => {
 
-    if (zoomLocked) return; // 👈 ADD THIS
+     zoomSession++; 
 
     zoomTransform = {
       scale: event.transform.k,
@@ -688,7 +732,13 @@ hoverContext.lineWidth = 1.7 / zoomTransform.scale;
 hoverContext.restore();
 }
 
+function buildHS2Cache() {
+  if (!hs2Injunction || !projection) return;
 
+  hs2Cached = new Path2D();
+  const hs2Path = d3.geoPath(projection).context(hs2Cached);
+  hs2Path(hs2Injunction);
+}
 
 function getView() {
   return `${geography}_${mode}`;
@@ -708,8 +758,8 @@ const scales = {
     .range(["#0a061b","#61187a","#b0349a","#e04d79","#fd842b","#fec083","#fcfd4f"]),
 
   lad_injunctions: d3.scaleThreshold()
-    .domain([1, 2, 5, 10, 20, 50, 111])
-    .range(["#0a061b","#2a0a3a","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f","#fff07a"])
+    .domain([ 1, 2, 5, 10, 20, 50, 111])
+    .range(["#0a061b","#2a0a3a","#61187a","#96308d","#d3477d","#fd842b","#fcfd4f"])
 };
 
 
@@ -784,10 +834,22 @@ context.setTransform(dpr, 0, 0, dpr, 0, 0);
 hoverContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 path = d3.geoPath(projection, context);
+
+hs2Cached = new Path2D();
+
+const hs2Path = d3.geoPath(projection).context(hs2Cached);
+hs2Path(hs2Injunction);
+
 hoverPath = d3.geoPath(projection, hoverContext);
 
+// HS2 CACHE (must be after projection + path exist)
+if (hs2Injunction) {
+  hs2Cached = new Path2D();
 
-d3.select(canvas).call(zoom);
+  const hs2Path = d3.geoPath(projection).context(hs2Cached);
+  hs2Path(hs2Injunction);
+}
+
 
 canvasSelection = d3.select(canvas);
 canvasSelection.call(zoom); 
@@ -836,43 +898,46 @@ if (animateOnLoad) {
 
 
 
+let hoverScheduled = false;
+let pendingEvent = null;
 
 canvas.addEventListener("mousemove", (e) => {
+  pendingEvent = e;
 
-  const rect = canvas.getBoundingClientRect();
+  if (hoverScheduled) return;
+  hoverScheduled = true;
 
-const sx =
-  ((e.clientX - rect.left) / rect.width) * width;
+  requestAnimationFrame(() => {
+    hoverScheduled = false;
 
-const sy =
-  ((e.clientY - rect.top) / rect.height) * height;
+    const e = pendingEvent;
+    if (!e) return;
 
-const x =
-  (sx - zoomTransform.x) /
-  zoomTransform.scale;
+    const rect = canvas.getBoundingClientRect();
 
-const y =
-  (sy - zoomTransform.y) /
-  zoomTransform.scale;
+    const sx =
+      ((e.clientX - rect.left) / rect.width) * width;
 
-  tooltipX = e.clientX - rect.left;
-  tooltipY = e.clientY - rect.top;
+    const sy =
+      ((e.clientY - rect.top) / rect.height) * height;
 
-if (geography === "ward") {
+    const x = (sx - zoomTransform.x) / zoomTransform.scale;
+    const y = (sy - zoomTransform.y) / zoomTransform.scale;
 
-  hoveredWard = findWard(x, y);
-  hovered = findLad(x, y);
+    tooltipX = e.clientX - rect.left;
+    tooltipY = e.clientY - rect.top;
 
-} else {
+    if (geography === "ward") {
+      hoveredWard = findWard(x, y);
+      hovered = findLad(x, y);
+    } else {
+      hovered = findLad(x, y);
+      hoveredWard = null;
+    }
 
-  hovered = findLad(x, y);
-  hoveredWard = null;
-}
-
-  requestAnimationFrame(drawHover);
+    drawHover(); // 👈 move it here (important)
+  });
 });
-
-  canvas.style.cursor = "crosshair";
 });
 </script>
 
@@ -886,6 +951,7 @@ if (geography === "ward") {
 >
     <canvas bind:this={canvas} class="base" />
     <canvas bind:this={hoverCanvas} class="hover" />
+
   </div>
 
 </div>
@@ -964,13 +1030,13 @@ if (geography === "ward") {
       <div>{hoveredWard.properties.WARD_Name}</div>
 
       <div>
-        in {hovered?.properties?.["LAD Name"] ?? "Unknown LAD"}
+        in {hovered?.properties?.["LAD.Name"] ?? "Unknown LAD"}
       </div>
 
       <div>
         {mode === "injunctions"
           ? `${+hoveredWard.properties.injunction_names || 0} injuncted areas`
-          : `${Math.max(0, +hoveredWard.properties.covered_area_ha || 0)} hectares injuncted`
+          : `${Math.max(0, +hoveredWard.properties.covered_area_ha_rounded || 0)} hectares injuncted`
         }
       </div>
     </div>
@@ -981,12 +1047,12 @@ if (geography === "ward") {
   >
 
     <div>
-      {hovered.properties["LAD Name"] ?? "Unknown LAD"}
+      {hovered.properties["LAD.Name"] ?? "Unknown LAD"}
     </div>
 
     <div>
       {mode === "injunctions"
-        ? `${+hovered.properties["Injunction Names"] || 0} injuncted areas`
+        ? `${+hovered.properties["Injunction.Names"] || 0} injuncted areas`
         : `${Number(getValue(hovered) || 0).toFixed(2)} hectares injuncted`
       }
     </div>
@@ -1045,11 +1111,15 @@ canvas {
   color: #fff;
   font-size: 0.9rem;
   white-space: nowrap;
+
+text-shadow:
+  0 1px 2px rgba(0, 0, 0, 0.6),
+  0 0 6px rgba(0, 0, 0, 0.3);
 }
 
 .geo-toggle {
   position: absolute;
-  top: 10px;
+  top: 20px;
   right: 12px;
   z-index: 20;
 
@@ -1104,7 +1174,7 @@ display: flex;
   left: 0;
   right: 0;
 
-  height: 160px;
+  height: 190px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
