@@ -172,9 +172,10 @@ The use of Protest Injunctions has been making protesting even more risky. Huge 
 }
 
 .landing {
-  min-height: 100vh;
+
+  min-height: 100dvh;
   overflow: hidden;
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;

@@ -3,9 +3,27 @@
   import { activePanel } from "$lib/stores/panel";
   import Stories from "./Stories.svelte";
 
+
+  let isMobile = false;
+
+
+let heroEl;
+
   let mapKey = 0;
   let showHS2 = false;
   let map2El;
+let showMap = !isMobile; // desktop loads immediately
+
+import { onMount } from "svelte";
+
+  onMount(() => {
+    const check = () => isMobile = window.innerWidth <= 900;
+
+    check();
+    window.addEventListener("resize", check);
+
+    return () => window.removeEventListener("resize", check);
+  });
 
   function intersection(node) {
     const obs = new IntersectionObserver(
@@ -13,7 +31,7 @@
         showHS2 = entry.isIntersecting;
       },
       {
-        threshold: [0, 0.25, 0.5, 0.75, 1]
+        threshold: 0.6
       }
     );
 
@@ -39,6 +57,29 @@
   $: if ($activePanel !== "map") {
     showHS2 = false;
   }
+
+function heroIntersection(node) {
+  const obs = new IntersectionObserver(
+    ([entry]) => {
+      // when hero is OUT of view → show map
+      if (!entry.isIntersecting) {
+        showMap = true;
+      }
+    },
+    {
+      threshold: 0.1
+    }
+  );
+
+  obs.observe(node);
+
+  return {
+    destroy() {
+      obs.disconnect();
+    }
+  };
+}
+
 </script>
 
 {#if $activePanel !== "stories"}
@@ -47,27 +88,44 @@
 	<!-- MAP SIDE -->
 	<div class="map-column">
 		<div class="map-sticky">
-<Map key={mapKey} hs2Visible={showHS2} />
-		</div>
+{#if showMap}
+<Map key={mapKey} hs2Visible={showHS2} disableInteraction={isMobile} />
+{/if}		</div>
 	</div>
 
 	<!-- TEXT SIDE -->
 	<div class="text-column">
 
-		<section class="step" id="map">
-			<h1>Protest Injunctions Across England and Wales</h1>
-			<p>
-				Interactive exploration of protest injunctions and the
-				areas they affect.
-			</p>
-		</section>
+<section
+  class="step hero-step"
+  bind:this={heroEl}
+  use:heroIntersection
+ id="map">
+
+  <div class="step-content">
+
+    <h1>Protest Injunctions Across England and Wales</h1>
+
+    <p>
+      Interactive exploration of protest injunctions and the areas they affect.
+    </p>
+
+  </div>
+
+</section>
 
 		<section class="step">
+
+    <div class="step-content">
+
 			<h2>Protest Activities Targeted</h2>
 			<p>text</p>
+</div>
 		</section>
 
 <section class="step" id="map2" bind:this={map2El} use:intersection>
+    <div class="step-content">
+
 			<h2>The HS2 injunction</h2>
 
 			<p>
@@ -78,18 +136,22 @@
 <button on:click={() => go("stories")}>
 	Stories →
 </button>
-				<button on:click={() => go("resources")}>
-					Resources →
-				</button>
+<button on:click={() => go("resources")}>
+    Resources →
+</button>
 
-				<button on:click={() => go("credits")}>
-					Credits →
-				</button>
+<button on:click={() => go("credits")}>
+    Credits →
+</button>
 			</div>
+</div>
 		</section>
+
 	</div>
 
 </div>
+
+
 {/if}
 <!-- ================= PANELS ================= -->
 
@@ -121,6 +183,7 @@
 		<div class="panel-inner">
 
 			<section class="step panel-step">
+
 				<h2>Resources</h2>
 
 				<p>
@@ -134,6 +197,7 @@
 				</ul>
 
 				<div class="links">
+
 <button on:click={() => go("stories")}>
 	Stories →
 </button>
@@ -169,6 +233,7 @@
 				</ul>
 
 				<div class="links">
+
 <button on:click={() => go("stories")}>
 	Stories →
 </button>
@@ -181,9 +246,9 @@
 					</button>
 				</div>
 			</section>
-
-		</div>
 	</div>
+	</div>
+
 {/if}
 
 <style>
@@ -206,10 +271,13 @@
 .map-sticky {
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: 100dvh;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+  transform: translateX(-2dvw);
+
+
 }
 
 /* RIGHT TEXT */
@@ -391,5 +459,166 @@ p {
 	text-decoration: underline;
 }
 
+@media (max-width: 900px) {
+
+  /* ================= ROOT LAYOUT ================= */
+
+  .page {
+    display: block;
+    position: relative;
+  }
+
+  /* ================= MAP (FULL SCREEN BACKGROUND) ================= */
+
+  .map-column {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 0;
+  }
+
+  .map-sticky {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+  transform: translateX(-0dvw);
+
+  }
+
+  /* IMPORTANT: allow map interaction */
+  .map-column,
+  .map-sticky {
+    pointer-events: auto;
+  }
+
+  /* ================= SCROLL LAYER ================= */
+
+  .text-column {
+    position: relative;
+    width: 100%;
+    padding: 0;
+    z-index: 10;
+
+    pointer-events: none;
+  }
+
+  /* ================= STEP BASE ================= */
+
+  .step {
+    min-height: 110vh;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 0rem 0rem;
+
+    background: transparent;
+
+    pointer-events: none;
+    padding-bottom: 90vh;
+
+  }
+
+  /* ================= CARD ================= */
+
+  .step-content {
+    width: 100%;
+    padding: 2.2rem;
+
+    background: rgba(10, 6, 27, 0.85);
+    backdrop-filter: blur(10px);
+
+    border-radius: 0px;
+
+    pointer-events: auto;
+  }
+
+  .step-content h1,
+  .step-content h2 {
+    margin-top: 0;
+  }
+
+  .step-content p,
+  .step-content ul,
+  .step-content .links {
+    margin-top: 1rem;
+  }
+
+  .step-content ul {
+    padding-left: 1.2rem;
+  }
+
+  /* ================= HERO OVERLAY (FIRST STEP) ================= */
+
+.hero-step {
+  min-height: 100vh;
+  display: flex;
+
+  /* THIS is the key change */
+  align-items: flex-start;
+  justify-content: flex-start;
+
+  /* push content down relative to viewport */
+  Padding-top:0rem
+}
+
+  .hero-step .step-content {
+    background: rgba(10, 6, 27, 0.);
+    backdrop-filter: blur(6px);
+
+  padding: 10rem 2.2rem 2.2rem 2.2rem;
+
+
+  }
+
+  /* ================= SNAP BEHAVIOUR ================= */
+
+  .text-column {
+    scroll-snap-type: y mandatory;
+  }
+
+  .step {
+    scroll-snap-align: start;
+  }
+
+  /* ================= PANEL OVERRIDES ================= */
+
+.panel {
+  position: fixed;
+  inset: 0;
+
+  width: auto;
+  height: auto;
+
+  align-items: flex-start;
+  justify-content: flex-start;
+
+  overflow-y: auto;
+}
+
+.panel-inner {
+  width: min(42rem, 100%);
+  margin: 0 auto;
+  padding: 10rem 2rem 4rem;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+  .panel-step {
+    width: 100%;
+    min-height: 100%;
+  pointer-events: auto;
+
+  }
+
+  .panel h2,
+  .panel p,
+  .panel ul,
+  .panel .links {
+    width: 100%;
+  }
+
+}
 
 </style>

@@ -7,9 +7,10 @@
 	let { children } = $props();
 </script>
 
-{#if $page.url.pathname !== `${base}/`}
+{#if $page.url.pathname.startsWith(`${base}/map`)}
 	<Header />
 {/if}
+
 
 <main id="content">
 	{@render children?.()}

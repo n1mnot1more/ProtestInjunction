@@ -248,10 +248,10 @@ function openPanel(panel) {
 		display: block;
 
 		position: fixed;
-		top: 0.75rem;
-		left: 0.75rem;
+		top: 1.5rem;
+		left: 1.1rem;
 
-		width: 2.8rem;
+		width: 4rem;
 
 		z-index: 1002;
 	}
@@ -266,8 +266,8 @@ function openPanel(panel) {
 		display: block;
 
 		position: fixed;
-		top: 0.55rem;
-		right: 0.75rem;
+		top: 3.2rem;
+		left: 0.5rem;
 
 		z-index: 1002;
 
@@ -283,13 +283,13 @@ function openPanel(panel) {
 	.nav {
 		position: fixed;
 
-		top: 0;
-		left: -240px;
+		top: 0px;
+		left: -180px;
 
-		width: 220px;
+		width: 180px;
 		height: 100vh;
 
-		padding: 5rem 1rem 1rem;
+		padding: 7rem 1rem 1rem;
 
 		background: rgba(10, 6, 27, 0.96);
 

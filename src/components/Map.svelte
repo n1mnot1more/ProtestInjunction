@@ -12,7 +12,8 @@ let pendingEvent = null;
 
 let {
   hs2Visible = false,
-  animateOnLoad = true
+  animateOnLoad = true,
+  disableInteraction = false
 } = $props();
 
 let hs2HasLockedView = false;
@@ -234,7 +235,8 @@ function animateZoom(scale, x, y, lock = false) {
 
   const start = { ...zoomTransform };
   const startTime = performance.now();
-  const duration = 1100;
+const isMobile = window.innerWidth < 900;
+const duration = isMobile ? 800 : 1100;
 
   function tick(t) {
     const p = Math.min(1, (t - startTime) / duration);
@@ -814,12 +816,16 @@ console.log(hs2Injunction);
 console.log(hs2Injunction.type);
 
 
+const isMobile = window.innerWidth < 900;
+
+const extent = isMobile
+  ? [[0, 70], [width - 25, height - 20]]  // shift left on mobile
+  : [[30, 30], [width - 25, height - 20]]; // normal on desktop
+
 projection = d3.geoIdentity()
   .reflectY(true)
-  .fitExtent(
-    [[30, 30], [width - 25, height - 20]],
-    wards
-  );
+  .fitExtent(extent, wards);
+
 
 canvas.width = width * dpr;
 canvas.height = height * dpr;
@@ -852,8 +858,9 @@ if (hs2Injunction) {
 
 
 canvasSelection = d3.select(canvas);
-canvasSelection.call(zoom); 
-
+if (!disableInteraction) {
+  canvasSelection.call(zoom);
+}
 /* HIT CANVASES */
 
 hitCanvas.width = width * dpr;
@@ -1084,6 +1091,7 @@ canvas.addEventListener("mousemove", (e) => {
 @media (max-width: 900px) {
   .canvas-stack {
     inset: 0px 0 0 0;
+
   }
 }
 
